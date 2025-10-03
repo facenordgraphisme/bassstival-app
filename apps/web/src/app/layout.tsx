@@ -33,7 +33,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           </nav>
         </header>
 
-        <Toaster richColors position="top-center" closeButton />
+        <Toaster richColors position="bottom-right" closeButton />
 
         <main className="mx-auto max-w-6xl p-6 space-y-8" style={{ fontFamily: "var(--font-sans)" }}>
           {children}
