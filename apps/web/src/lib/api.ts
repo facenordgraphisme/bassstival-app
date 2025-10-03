@@ -56,7 +56,7 @@ export function createLoan(payload: {
   borrowerName: string;
   note?: string;
   items?: { itemName: string; qtyOut: number; note?: string }[];
-}) {
+}): Promise<{ id: string }> {  // ⬅️ ajoute ce type de retour
   return request(`/loans`, {
     method: "POST",
     body: JSON.stringify(payload),
