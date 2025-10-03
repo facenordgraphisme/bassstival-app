@@ -1,4 +1,3 @@
-// apps/web/src/app/HomeClient.tsx
 "use client";
 import { useMemo, useState } from "react";
 import useSWR from "swr";
@@ -6,15 +5,7 @@ import LoansGrid from "@/components/LoansGrid";
 import NeonSwitch from "@/components/NeonSwitch";
 import { listLoans, searchLoans } from "@/lib/api";
 import { Search, X } from "lucide-react";
-
-type Loan = {
-  id: string;
-  borrowerName: string;
-  status: "open" | "closed";
-  openedAt?: string | null;
-  closedAt?: string | null;
-  matchedItems?: string[]; // ⬅️ items qui matchent la recherche (renvoyés par /loans/search)
-};
+import type { Loan } from "@/lib/types";
 
 export default function HomeClient({
   initialOpen,
@@ -50,17 +41,31 @@ export default function HomeClient({
     { keepPreviousData: true }
   );
 
-  // Sélection des données à afficher
-  const dataOpen = query.length >= 2
-    ? (onlyOpen ? (searchOpen || []) : (searchAll || []).filter(l => l.status === "open"))
-    : (openData || []);
+  // Sélections mémoïsées pour éviter les warnings de deps
+  const dataOpenSelected = useMemo<Loan[]>(() => {
+    if (query.length >= 2) {
+      return onlyOpen
+        ? (searchOpen ?? [])
+        : (searchAll ?? []).filter((l) => l.status === "open");
+    }
+    return openData ?? [];
+  }, [query.length, onlyOpen, searchOpen, searchAll, openData]);
 
-  const dataAll = query.length >= 2
-    ? (searchAll || [])
-    : (allData || []);
+  const dataAllSelected = useMemo<Loan[]>(() => {
+    if (query.length >= 2) {
+      return searchAll ?? [];
+    }
+    return allData ?? [];
+  }, [query.length, searchAll, allData]);
 
-  const open  = useMemo(() => dataAll.filter(l => l.status === "open"),  [dataAll]);
-  const closed= useMemo(() => dataAll.filter(l => l.status === "closed"), [dataAll]);
+  const open = useMemo(
+    () => dataAllSelected.filter((l) => l.status === "open"),
+    [dataAllSelected]
+  );
+  const closed = useMemo(
+    () => dataAllSelected.filter((l) => l.status === "closed"),
+    [dataAllSelected]
+  );
 
   return (
     <>
@@ -106,10 +111,10 @@ export default function HomeClient({
 
       {onlyOpen ? (
         // Mode “Uniquement ouvertes”
-        dataOpen.length === 0 ? (
+        dataOpenSelected.length === 0 ? (
           <div className="text-sm opacity-70 mt-2">Aucun résultat.</div>
         ) : (
-          <LoansGrid loans={dataOpen} query={query} />
+          <LoansGrid loans={dataOpenSelected} query={query} />
         )
       ) : (
         // Mode “Tout” → deux sections

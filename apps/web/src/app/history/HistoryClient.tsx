@@ -2,16 +2,19 @@
 import { useState } from "react";
 import { StaggerList } from "@/components/FX";
 import NeonSwitch from "@/components/NeonSwitch";
+import type { Loan } from "@/lib/types";
 
 function RemainingBadge({ remaining }: { remaining: number }) {
   if (remaining <= 0) return <span className="badge badge-green ml-2">Tout rendu</span>;
   return <span className="badge badge-red ml-2">Manque {remaining}</span>;
 }
 
+type LoanWithRemaining = Loan & { remaining: number };
+
 export default function HistoryClient({
   open,
   closed,
-}: { open: any[]; closed: any[] }) {
+}: { open: Loan[]; closed: LoanWithRemaining[] }) {
   const [onlyMissing, setOnlyMissing] = useState(false);
   const filteredClosed = onlyMissing ? closed.filter((l) => l.remaining > 0) : closed;
 

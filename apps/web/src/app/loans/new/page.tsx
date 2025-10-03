@@ -27,8 +27,9 @@ export default function NewLoan() {
       const { id } = await createLoan({ borrowerName: name, note, items });
       toast.success("Fiche créée ✨", { id: t });
       location.href = `/loans/${id}`;
-    } catch (e: any) {
-      toast.error(e?.message || "Erreur création fiche", { id: t });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Erreur création fiche";
+      toast.error(msg, { id: t });
     } finally {
       setLoading(false);
     }

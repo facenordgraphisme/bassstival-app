@@ -16,7 +16,7 @@ export default function Brand() {
       />
       <span>
         <span className="text-[#ff7a1a]">BASS</span>
-        <span className="text-[#ff5a5f]">S'TIVAL</span> • OUTILS
+        <span className="text-[#ff5a5f]">S&apos;TIVAL</span> • OUTILS
       </span>
     </Link>
   );
