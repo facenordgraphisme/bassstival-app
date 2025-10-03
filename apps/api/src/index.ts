@@ -26,5 +26,7 @@ app.use(express.json());
 app.get("/health", (_, res) => res.json({ ok: true }));
 app.use("/loans", loansRouter);
 
-const port = process.env.PORT || 3001;
-app.listen(port, () => console.log(`API on :${port}`));
+const port = Number(process.env.PORT) || 8000;
+app.listen(port, "0.0.0.0", () => {
+  console.log(`API on :${port}`);
+});
