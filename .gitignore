@@ -1,0 +1,36 @@
+# --- Node ---
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json
+
+# --- Build outputs ---
+dist
+.next
+out
+coverage
+
+# --- Env / secrets ---
+.env
+.env.*
+*.env.local
+
+# --- Drizzle ---
+drizzle/*.sql       # si tu ne veux PAS commiter les migrations
+drizzle.config.json # ancien fichier sensible à ne jamais pusher
+
+# --- System files ---
+.DS_Store
+Thumbs.db
+
+# --- Logs ---
+*.log
+logs
+*.log.*
+
+# --- Editor ---
+.vscode
+.idea
+*.swp
