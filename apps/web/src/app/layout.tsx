@@ -4,6 +4,7 @@ import { Unbounded, Inter } from "next/font/google";
 import { Toaster } from "sonner";
 import ThemeToggle from "@/components/ThemeToggle";
 import Brand from "@/components/Brand";
+import Link from "next/link";
 
 const unbounded = Unbounded({ subsets: ["latin"], variable: "--font-title" });
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
@@ -26,9 +27,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 
             <div className="flex items-center gap-4">
               <ThemeToggle />
-              <a className="btn" href="/">Fiches ouvertes</a>
-              <a className="btn" href="/loans/new">Nouvelle fiche</a>
-              <a className="btn" href="/history">Historique</a>
+              <Link className="btn" href="/">Fiches ouvertes</Link>
+              <Link className="btn" href="/loans/new">Nouvelle fiche</Link>
+              <Link className="btn" href="/history">Historique</Link>
             </div>
           </nav>
         </header>
