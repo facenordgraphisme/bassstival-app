@@ -4,17 +4,11 @@ import { useMemo, useState } from "react";
 import useSWR from "swr";
 import { toast } from "sonner";
 import { listShifts, createShift, deleteShift } from "@/lib/api";
-import type { Shift, Team } from "@/lib/types";
+import type { Shift, Team } from "@/lib/volunteers";
 import { Plus, Trash2, Calendar, MapPin } from "lucide-react";
 
 const TEAMS: Team[] = ["bar", "billetterie", "parking", "bassspatrouille", "tech", "autre"];
 
-function toLocalDatetimeValue(iso?: string) {
-  if (!iso) return "";
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
 function fromLocalDatetimeValue(val: string) {
   // '2025-07-12T18:00' -> ISO
   return new Date(val).toISOString();
@@ -95,8 +89,9 @@ export default function ShiftsClient({ initial }: { initial: Shift[] }) {
       setShowForm(false);
       setForm({ team: "", title: "", startAt: "", endAt: "", capacity: 1, location: "", notes: "" });
       mutate();
-    } catch (e: any) {
-      toast.error(e?.message || "Erreur création", { id: t });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Erreur création";
+      toast.error(msg, { id: t });
     }
   };
 
@@ -106,8 +101,9 @@ export default function ShiftsClient({ initial }: { initial: Shift[] }) {
       await deleteShift(id);
       toast.success("Shift supprimé", { id: t });
       mutate();
-    } catch (e: any) {
-      toast.error(e?.message || "Erreur suppression", { id: t });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Erreur suppression";
+      toast.error(msg, { id: t });
     }
   };
 
