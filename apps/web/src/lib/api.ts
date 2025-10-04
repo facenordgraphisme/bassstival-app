@@ -1,3 +1,5 @@
+import type { Shift, Team } from "./volunteers";
+
 const BASE = process.env.NEXT_PUBLIC_API_URL!;
 
 // --- Types ---
@@ -27,10 +29,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
     ...init,
   });
+
   if (!r.ok) {
-    // tu peux améliorer le message si besoin
-    throw new Error(`Request failed: ${r.status} ${r.statusText}`);
+    let msg = `Request failed: ${r.status} ${r.statusText}`;
+    try {
+      const body = await r.json();
+      if (body?.error) msg += ` – ${body.error}`;
+    } catch {}
+    throw new Error(msg);
   }
+
   return r.json() as Promise<T>;
 }
 
@@ -98,4 +106,56 @@ export function searchLoans(
   return request<(Loan & { matchedItems?: string[] })[]>(
     `/loans/search?${params.toString()}`
   );
+}
+
+// --------- SHIFTS (BÉNÉVOLES) ----------
+export function listShifts(params?: { team?: Team; from?: string; to?: string }): Promise<Shift[]> {
+  const sp = new URLSearchParams();
+  if (params?.team) sp.set("team", params.team);
+  if (params?.from) sp.set("from", params.from);
+  if (params?.to)   sp.set("to", params.to);
+  const qs = sp.toString();
+  return request<Shift[]>(`/volunteers/shifts${qs ? `?${qs}` : ""}`);
+}
+
+export async function createShift(payload: {
+  team: Team;
+  title: string;
+  startAt: string;  // ISO
+  endAt: string;    // ISO
+  capacity?: number;
+  location?: string | null;
+  notes?: string | null;
+}): Promise<Shift> {
+  const r = await fetch(`${BASE}/volunteers/shifts`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!r.ok) throw new Error((await r.json().catch(() => null))?.error || "createShift failed");
+  return r.json();
+}
+
+export async function updateShift(id: string, patch: Partial<{
+  team: Team;
+  title: string;
+  startAt: string;  // ISO
+  endAt: string;    // ISO
+  capacity: number;
+  location: string | null;
+  notes: string | null;
+}>): Promise<{ ok: true }> {
+  const r = await fetch(`${BASE}/volunteers/shifts/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  if (!r.ok) throw new Error("updateShift failed");
+  return r.json();
+}
+
+export async function deleteShift(id: string): Promise<{ ok: true }> {
+  const r = await fetch(`${BASE}/volunteers/shifts/${id}`, { method: "DELETE" });
+  if (!r.ok) throw new Error("deleteShift failed");
+  return r.json();
 }

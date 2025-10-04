@@ -1,5 +1,6 @@
 export type ItemStatus = "open" | "returned";
 export type LoanStatus = "open" | "closed";
+export type Team = "bar" | "billetterie" | "parking" | "bassspatrouille" | "tech" | "autre";
 
 export type LoanItem = {
   id: string;
@@ -23,4 +24,16 @@ export type Loan = {
 
 export type LoanDetail = Loan & {
   items: LoanItem[];
+};
+
+export type Shift = {
+  id: string;
+  team: Team;
+  title: string;
+  startAt: string;
+  endAt: string;
+  capacity: number;
+  location?: string | null;
+  notes?: string | null;
+  createdAt?: string | null;
 };

@@ -14,9 +14,9 @@ export default function Brand() {
         className="rounded-md"
         priority
       />
-      <span>
-        <span className="text-[#ff7a1a]">BASS</span>
-        <span className="text-[#ff5a5f]">S&apos;TIVAL</span> • APP
+      <span className="text-lg lg:text-xl">
+        <span className="text-[#ff7a1a] text-lg lg:text-xl">BASS</span>
+        <span className="text-[#ff5a5f] text-lg lg:text-xl">S&apos;TIVAL</span> • APP
       </span>
     </Link>
   );

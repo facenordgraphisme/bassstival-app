@@ -2,6 +2,7 @@ const BASE = process.env.NEXT_PUBLIC_API_URL!;
 
 // ---- Volunteers ----
 export type Team = "bar" | "billetterie" | "parking" | "bassspatrouille" | "tech" | "autre";
+
 export type Volunteer = {
   id: string;
   firstName: string;
@@ -9,6 +10,18 @@ export type Volunteer = {
   phone?: string | null;
   email?: string | null;
   team: Team;
+  notes?: string | null;
+  createdAt?: string | null;
+};
+
+export type Shift = {
+  id: string;
+  team: Team;
+  title: string;
+  startAt: string;      // ISO
+  endAt: string;        // ISO
+  capacity: number;
+  location?: string | null;
   notes?: string | null;
   createdAt?: string | null;
 };

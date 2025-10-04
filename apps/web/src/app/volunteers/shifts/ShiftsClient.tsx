@@ -1,0 +1,276 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import useSWR from "swr";
+import { toast } from "sonner";
+import { listShifts, createShift, deleteShift } from "@/lib/api";
+import type { Shift, Team } from "@/lib/types";
+import { Plus, Trash2, Calendar, MapPin } from "lucide-react";
+
+const TEAMS: Team[] = ["bar", "billetterie", "parking", "bassspatrouille", "tech", "autre"];
+
+function toLocalDatetimeValue(iso?: string) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function fromLocalDatetimeValue(val: string) {
+  // '2025-07-12T18:00' -> ISO
+  return new Date(val).toISOString();
+}
+
+export default function ShiftsClient({ initial }: { initial: Shift[] }) {
+  const [team, setTeam] = useState<Team | "">("");
+  const [from, setFrom] = useState<string>(""); // datetime-local
+  const [to, setTo] = useState<string>("");     // datetime-local
+
+  // Create form
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState<{
+    team: Team | "";
+    title: string;
+    startAt: string; // datetime-local
+    endAt: string;   // datetime-local
+    capacity: number;
+    location: string;
+    notes: string;
+  }>({
+    team: "",
+    title: "",
+    startAt: "",
+    endAt: "",
+    capacity: 1,
+    location: "",
+    notes: "",
+  });
+
+  const { data, mutate, isLoading } = useSWR<Shift[]>(
+    ["volunteers", "shifts", team || "-", from || "-", to || "-"],
+    () =>
+      listShifts({
+        team: team || undefined,
+        from: from ? fromLocalDatetimeValue(from) : undefined,
+        to: to ? fromLocalDatetimeValue(to) : undefined,
+      }),
+    { fallbackData: initial, keepPreviousData: true }
+  );
+
+  const grouped = useMemo(() => {
+    const rows = (data || []).slice().sort((a, b) => +new Date(a.startAt) - +new Date(b.startAt));
+    const byDay = new Map<string, Shift[]>();
+    for (const s of rows) {
+      const d = new Date(s.startAt);
+      const key = d.toLocaleDateString();
+      if (!byDay.has(key)) byDay.set(key, []);
+      byDay.get(key)!.push(s);
+    }
+    return Array.from(byDay.entries()); // [ [dateLabel, shifts[]], ... ]
+  }, [data]);
+
+  const onCreate = async () => {
+    if (!form.team || !form.title || !form.startAt || !form.endAt) {
+      toast.error("Team, titre et horaires requis");
+      return;
+    }
+    const s = new Date(form.startAt);
+    const e = new Date(form.endAt);
+    if (isNaN(s.getTime()) || isNaN(e.getTime()) || e <= s) {
+      toast.error("Plage horaire invalide (fin après début)");
+      return;
+    }
+
+    const t = toast.loading("Création du shift…");
+    try {
+      await createShift({
+        team: form.team,
+        title: form.title.trim(),
+        startAt: fromLocalDatetimeValue(form.startAt),
+        endAt: fromLocalDatetimeValue(form.endAt),
+        capacity: Number(form.capacity) || 1,
+        location: form.location?.trim() || null,
+        notes: form.notes?.trim() || null,
+      });
+      toast.success("Shift créé ✅", { id: t });
+      setShowForm(false);
+      setForm({ team: "", title: "", startAt: "", endAt: "", capacity: 1, location: "", notes: "" });
+      mutate();
+    } catch (e: any) {
+      toast.error(e?.message || "Erreur création", { id: t });
+    }
+  };
+
+  const onDelete = async (id: string) => {
+    const t = toast.loading("Suppression…");
+    try {
+      await deleteShift(id);
+      toast.success("Shift supprimé", { id: t });
+      mutate();
+    } catch (e: any) {
+      toast.error(e?.message || "Erreur suppression", { id: t });
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Filtres */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex flex-col">
+            <label className="text-xs opacity-70 mb-1">Équipe</label>
+            <select className="input" value={team} onChange={(e) => setTeam(e.target.value as Team | "")}>
+              <option value="">Toutes</option>
+              {TEAMS.map((t) => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex flex-col">
+            <label className="text-xs opacity-70 mb-1">Du</label>
+            <input className="input" type="datetime-local" value={from} onChange={(e) => setFrom(e.target.value)} />
+          </div>
+
+          <div className="flex flex-col">
+            <label className="text-xs opacity-70 mb-1">Au</label>
+            <input className="input" type="datetime-local" value={to} onChange={(e) => setTo(e.target.value)} />
+          </div>
+
+          {(from || to || team) && (
+            <button className="btn-ghost self-start sm:self-end" onClick={() => { setTeam(""); setFrom(""); setTo(""); }}>
+              Réinitialiser
+            </button>
+          )}
+        </div>
+
+        <button className="btn" onClick={() => setShowForm((v) => !v)}>
+          <Plus size={16} className="mr-2" /> Nouveau shift
+        </button>
+      </div>
+
+      {/* Formulaire création */}
+      {showForm && (
+        <div className="card space-y-4">
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs opacity-70 mb-1 block">Équipe</label>
+              <select
+                className="input w-full"
+                value={form.team}
+                onChange={(e) => setForm((f) => ({ ...f, team: e.target.value as Team }))}
+              >
+                <option value="">— Choisir —</option>
+                {TEAMS.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs opacity-70 mb-1 block">Titre</label>
+              <input
+                className="input w-full"
+                placeholder="Service Bar 18-21"
+                value={form.title}
+                onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+              />
+            </div>
+
+            <div>
+              <label className="text-xs opacity-70 mb-1 block">Début</label>
+              <input
+                className="input w-full"
+                type="datetime-local"
+                value={form.startAt}
+                onChange={(e) => setForm((f) => ({ ...f, startAt: e.target.value }))}
+              />
+            </div>
+
+            <div>
+              <label className="text-xs opacity-70 mb-1 block">Fin</label>
+              <input
+                className="input w-full"
+                type="datetime-local"
+                value={form.endAt}
+                onChange={(e) => setForm((f) => ({ ...f, endAt: e.target.value }))}
+              />
+            </div>
+
+            <div>
+              <label className="text-xs opacity-70 mb-1 block">Capacité</label>
+              <input
+                className="input w-full"
+                type="number"
+                min={1}
+                value={form.capacity}
+                onChange={(e) => setForm((f) => ({ ...f, capacity: Number(e.target.value) }))}
+              />
+            </div>
+
+            <div>
+              <label className="text-xs opacity-70 mb-1 block">Lieu</label>
+              <input
+                className="input w-full"
+                placeholder="Bar central"
+                value={form.location}
+                onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="text-xs opacity-70 mb-1 block">Notes</label>
+              <textarea
+                className="input w-full h-20"
+                placeholder="Détails / consignes…"
+                value={form.notes}
+                onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <button className="btn-ghost" onClick={() => setShowForm(false)}>Annuler</button>
+            <button className="btn" onClick={onCreate}>Créer</button>
+          </div>
+        </div>
+      )}
+
+      {/* Liste */}
+      <div className="space-y-8">
+        {isLoading && <div className="opacity-70 text-sm">Chargement…</div>}
+        {grouped.length === 0 && !isLoading && <div className="opacity-70 text-sm">Aucun shift.</div>}
+
+        {grouped.map(([dayLabel, rows]) => (
+          <section key={dayLabel} className="space-y-3">
+            <h2 className="text-lg font-bold">{dayLabel}</h2>
+            <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {rows.map((s) => (
+                <div key={s.id} className="card neon space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm uppercase tracking-wide opacity-70">{s.team}</div>
+                    <button className="btn-ghost" onClick={() => onDelete(s.id)} title="Supprimer">
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                  <div className="text-lg font-semibold">{s.title}</div>
+                  <div className="text-sm flex items-center gap-2 opacity-80">
+                    <Calendar size={16} />
+                    <span>
+                      {new Date(s.startAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      {" — "}
+                      {new Date(s.endAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  </div>
+                  <div className="text-sm flex items-center gap-2 opacity-80">
+                    <MapPin size={16} />
+                    <span>{s.location || "—"}</span>
+                  </div>
+                  <div className="text-sm opacity-80">Capacité: <strong>{s.capacity}</strong></div>
+                  {s.notes && <div className="text-xs opacity-70">{s.notes}</div>}
+                </div>
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
+    </div>
+  );
+}

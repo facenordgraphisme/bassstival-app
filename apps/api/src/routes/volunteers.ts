@@ -150,6 +150,186 @@ router.get("/", async (req: Request, res: Response) => {
   }
 });
 
+
+
+/* ============ SHIFTS ============ */
+
+/** Créer un shift */
+router.post("/shifts", async (req: Request, res: Response) => {
+  try {
+    const body = (req.body as CreateShiftBody) || {};
+    const startAt = parseDate(body.startAt);
+    const endAt = parseDate(body.endAt);
+
+    if (!body.team) return res.status(400).json({ error: "team requis" });
+    if (!body.title) return res.status(400).json({ error: "title requis" });
+    if (!startAt || !endAt || endAt <= startAt) {
+      return res.status(400).json({ error: "startAt/endAt invalides" });
+    }
+
+    const [s] = await db
+      .insert(shifts)
+      .values({
+        team: body.team,
+        title: body.title,
+        startAt,
+        endAt,
+        capacity: typeof body.capacity === "number" ? body.capacity : 1,
+        location: body.location ?? null,
+        notes: body.notes ?? null,
+      })
+      .returning();
+
+    return res.status(201).json(s);
+  } catch (e: any) {
+    return res.status(500).json({ error: e?.message || "Server error" });
+  }
+});
+
+/** Lister les shifts (filtres team/période) */
+router.get("/shifts", async (req, res) => {
+  try {
+    const team = (req.query.team as Team | undefined) || undefined;
+    const from = parseDate(req.query.from);
+    const to   = parseDate(req.query.to);
+
+    const parts = [];
+    if (team) parts.push(eq(shifts.team, team));
+    if (from) parts.push(gte(shifts.startAt, from));
+    if (to)   parts.push(lte(shifts.endAt, to));
+
+    const base = db.select().from(shifts);
+
+    const rows = await (
+      parts.length > 0
+        ? base.where(and(...parts)).orderBy(asc(shifts.startAt))
+        : base.orderBy(asc(shifts.startAt))
+    );
+
+    return res.json(rows);
+  } catch (e: any) {
+    return res.status(500).json({ error: e?.message || "Server error" });
+  }
+});
+
+/* ============ ASSIGNMENTS ============ */
+
+/** Assigner un bénévole à un shift */
+router.post("/assignments", async (req: Request, res: Response) => {
+  try {
+    const { shiftId, volunteerId } = (req.body as AssignBody) || {};
+    if (!shiftId || !volunteerId) {
+      return res.status(400).json({ error: "shiftId et volunteerId requis" });
+    }
+
+    try {
+      const [a] = await db
+        .insert(assignments)
+        .values({ shiftId, volunteerId })
+        .returning();
+
+      return res.status(201).json(a);
+    } catch (err: any) {
+      const msg = String(err?.message || "");
+      if (msg.includes("uq_assignment")) {
+        return res.status(409).json({ error: "Déjà assigné à ce shift" });
+      }
+      throw err;
+    }
+  } catch (e: any) {
+    return res.status(500).json({ error: e?.message || "Server error" });
+  }
+});
+
+/** Lister les assignments (filtre par shiftId / volunteerId) */
+router.get("/assignments", async (req: Request, res: Response) => {
+  try {
+    const shiftId = (req.query.shiftId as string | undefined) || undefined;
+    const volunteerId = (req.query.volunteerId as string | undefined) || undefined;
+
+    const whereParts = [];
+    if (shiftId) whereParts.push(eq(assignments.shiftId, shiftId));
+    if (volunteerId) whereParts.push(eq(assignments.volunteerId, volunteerId));
+    const where = whereParts.length > 0 ? and(...whereParts) : undefined;
+
+    const rows = await db
+      .select()
+      .from(assignments)
+      .where(where as any)
+      .orderBy(desc(assignments.assignedAt));
+
+    return res.json(rows);
+  } catch (e: any) {
+    return res.status(500).json({ error: e?.message || "Server error" });
+  }
+});
+
+router.post("/checkins", async (req: Request, res: Response) => {
+  try {
+    const body = (req.body as CheckBody) || {};
+    if (!("action" in body) || !body.action) {
+      return res.status(400).json({ error: "action requis" });
+    }
+
+    let assignmentId: string | null = null;
+
+    if ("assignmentId" in body && body.assignmentId) {
+      assignmentId = body.assignmentId;
+    } else if ("shiftId" in body && "volunteerId" in body && body.shiftId && body.volunteerId) {
+      assignmentId = await getAssignmentIdFromShiftAndVolunteer(body.shiftId, body.volunteerId);
+      if (!assignmentId) {
+        return res.status(404).json({ error: "Affectation introuvable (shiftId/volunteerId)" });
+      }
+    } else {
+      return res.status(400).json({ error: "assignmentId ou (shiftId+volunteerId) requis" });
+    }
+
+    if (body.action === "in") {
+      const [row] = await db
+        .insert(checkins)
+        .values({
+          assignmentId,
+          checkinAt: new Date(),
+          status: "in",
+        })
+        .onConflictDoUpdate({
+          target: [checkins.assignmentId],
+          set: { checkinAt: new Date(), status: "in" },
+        })
+        .returning();
+      return res.json(row);
+    }
+
+    if (body.action === "out") {
+      const [row] = await db
+        .update(checkins)
+        .set({ checkoutAt: new Date(), status: "done" })
+        .where(eq(checkins.assignmentId, assignmentId))
+        .returning();
+      return res.json(row ?? { ok: true });
+    }
+
+    if (body.action === "no_show") {
+      const [row] = await db
+        .insert(checkins)
+        .values({
+          assignmentId,
+          status: "no_show",
+        })
+        .onConflictDoUpdate({
+          target: [checkins.assignmentId],
+          set: { status: "no_show" },
+        })
+        .returning();
+      return res.json(row);
+    }
+
+    return res.status(400).json({ error: "action invalide" });
+  } catch (e: any) {
+    return res.status(500).json({ error: e?.message || "Server error" });
+  }
+});
+
 /** Détail bénévole */
 router.get("/:id", async (req: Request, res: Response) => {
   try {
@@ -198,66 +378,6 @@ router.delete("/:id", async (req: Request, res: Response) => {
 
     await db.delete(volunteers).where(eq(volunteers.id, id));
     return res.json({ ok: true });
-  } catch (e: any) {
-    return res.status(500).json({ error: e?.message || "Server error" });
-  }
-});
-
-/* ============ SHIFTS ============ */
-
-/** Créer un shift */
-router.post("/shifts", async (req: Request, res: Response) => {
-  try {
-    const body = (req.body as CreateShiftBody) || {};
-    const startAt = parseDate(body.startAt);
-    const endAt = parseDate(body.endAt);
-
-    if (!body.team) return res.status(400).json({ error: "team requis" });
-    if (!body.title) return res.status(400).json({ error: "title requis" });
-    if (!startAt || !endAt || endAt <= startAt) {
-      return res.status(400).json({ error: "startAt/endAt invalides" });
-    }
-
-    const [s] = await db
-      .insert(shifts)
-      .values({
-        team: body.team,
-        title: body.title,
-        startAt,
-        endAt,
-        capacity: typeof body.capacity === "number" ? body.capacity : 1,
-        location: body.location ?? null,
-        notes: body.notes ?? null,
-      })
-      .returning();
-
-    return res.status(201).json(s);
-  } catch (e: any) {
-    return res.status(500).json({ error: e?.message || "Server error" });
-  }
-});
-
-/** Lister les shifts (filtres team/période) */
-router.get("/shifts", async (req: Request, res: Response) => {
-  try {
-    const team = (req.query.team as Team | undefined) || undefined;
-    const from = parseDate(req.query.from);
-    const to = parseDate(req.query.to);
-
-    const whereParts = [];
-    if (team) whereParts.push(eq(shifts.team, team));
-    if (from) whereParts.push(gte(shifts.startAt, from));
-    if (to) whereParts.push(lte(shifts.endAt, to));
-
-    const where = whereParts.length > 0 ? and(...whereParts) : undefined;
-
-    const rows = await db
-      .select()
-      .from(shifts)
-      .where(where as any)
-      .orderBy(asc(shifts.startAt));
-
-    return res.json(rows);
   } catch (e: any) {
     return res.status(500).json({ error: e?.message || "Server error" });
   }
@@ -325,57 +445,6 @@ router.delete("/shifts/:id", async (req: Request, res: Response) => {
   }
 });
 
-/* ============ ASSIGNMENTS ============ */
-
-/** Assigner un bénévole à un shift */
-router.post("/assignments", async (req: Request, res: Response) => {
-  try {
-    const { shiftId, volunteerId } = (req.body as AssignBody) || {};
-    if (!shiftId || !volunteerId) {
-      return res.status(400).json({ error: "shiftId et volunteerId requis" });
-    }
-
-    try {
-      const [a] = await db
-        .insert(assignments)
-        .values({ shiftId, volunteerId })
-        .returning();
-
-      return res.status(201).json(a);
-    } catch (err: any) {
-      const msg = String(err?.message || "");
-      if (msg.includes("uq_assignment")) {
-        return res.status(409).json({ error: "Déjà assigné à ce shift" });
-      }
-      throw err;
-    }
-  } catch (e: any) {
-    return res.status(500).json({ error: e?.message || "Server error" });
-  }
-});
-
-/** Lister les assignments (filtre par shiftId / volunteerId) */
-router.get("/assignments", async (req: Request, res: Response) => {
-  try {
-    const shiftId = (req.query.shiftId as string | undefined) || undefined;
-    const volunteerId = (req.query.volunteerId as string | undefined) || undefined;
-
-    const whereParts = [];
-    if (shiftId) whereParts.push(eq(assignments.shiftId, shiftId));
-    if (volunteerId) whereParts.push(eq(assignments.volunteerId, volunteerId));
-    const where = whereParts.length > 0 ? and(...whereParts) : undefined;
-
-    const rows = await db
-      .select()
-      .from(assignments)
-      .where(where as any)
-      .orderBy(desc(assignments.assignedAt));
-
-    return res.json(rows);
-  } catch (e: any) {
-    return res.status(500).json({ error: e?.message || "Server error" });
-  }
-});
 
 /** Désassigner (par id d’affectation) */
 router.delete("/assignments/:id", async (req: Request, res: Response) => {
@@ -385,78 +454,6 @@ router.delete("/assignments/:id", async (req: Request, res: Response) => {
 
     await db.delete(assignments).where(eq(assignments.id, id));
     return res.json({ ok: true });
-  } catch (e: any) {
-    return res.status(500).json({ error: e?.message || "Server error" });
-  }
-});
-
-/* ============ CHECK-INS (pointage) ============ */
-
-/**
- * Pointer un bénévole (in / out / no_show)
- * - Accepte soit { assignmentId }, soit { shiftId, volunteerId } et résout l'affectation.
- */
-router.post("/checkins", async (req: Request, res: Response) => {
-  try {
-    const body = (req.body as CheckBody) || {};
-    if (!("action" in body) || !body.action) {
-      return res.status(400).json({ error: "action requis" });
-    }
-
-    let assignmentId: string | null = null;
-
-    if ("assignmentId" in body && body.assignmentId) {
-      assignmentId = body.assignmentId;
-    } else if ("shiftId" in body && "volunteerId" in body && body.shiftId && body.volunteerId) {
-      assignmentId = await getAssignmentIdFromShiftAndVolunteer(body.shiftId, body.volunteerId);
-      if (!assignmentId) {
-        return res.status(404).json({ error: "Affectation introuvable (shiftId/volunteerId)" });
-      }
-    } else {
-      return res.status(400).json({ error: "assignmentId ou (shiftId+volunteerId) requis" });
-    }
-
-    if (body.action === "in") {
-      const [row] = await db
-        .insert(checkins)
-        .values({
-          assignmentId,
-          checkinAt: new Date(),
-          status: "in",
-        })
-        .onConflictDoUpdate({
-          target: [checkins.assignmentId],
-          set: { checkinAt: new Date(), status: "in" },
-        })
-        .returning();
-      return res.json(row);
-    }
-
-    if (body.action === "out") {
-      const [row] = await db
-        .update(checkins)
-        .set({ checkoutAt: new Date(), status: "done" })
-        .where(eq(checkins.assignmentId, assignmentId))
-        .returning();
-      return res.json(row ?? { ok: true });
-    }
-
-    if (body.action === "no_show") {
-      const [row] = await db
-        .insert(checkins)
-        .values({
-          assignmentId,
-          status: "no_show",
-        })
-        .onConflictDoUpdate({
-          target: [checkins.assignmentId],
-          set: { status: "no_show" },
-        })
-        .returning();
-      return res.json(row);
-    }
-
-    return res.status(400).json({ error: "action invalide" });
   } catch (e: any) {
     return res.status(500).json({ error: e?.message || "Server error" });
   }
