@@ -4,7 +4,8 @@ import useSWR from "swr";
 import LoansGrid from "@/components/LoansGrid";
 import NeonSwitch from "@/components/NeonSwitch";
 import { listLoans, searchLoans } from "@/lib/api";
-import { Search, X } from "lucide-react";
+import { Search, X, PlusCircle, History } from "lucide-react";
+import Link from "next/link";
 import type { Loan } from "@/lib/types";
 
 export default function HomeClient({
@@ -17,7 +18,6 @@ export default function HomeClient({
   const [onlyOpen, setOnlyOpen] = useState(true);
   const [query, setQuery] = useState("");
 
-  // Données de base (SWR) avec fallback SSR
   const { data: openData } = useSWR<Loan[]>(
     ["loans", "open"],
     () => listLoans("open"),
@@ -29,7 +29,6 @@ export default function HomeClient({
     { fallbackData: initialAll }
   );
 
-  // Recherche distante (SWR) — seulement si query >= 2
   const { data: searchOpen } = useSWR<Loan[]>(
     query.length >= 2 && onlyOpen ? ["loans", "search", query, "open"] : null,
     () => searchLoans(query, "open"),
@@ -41,7 +40,6 @@ export default function HomeClient({
     { keepPreviousData: true }
   );
 
-  // Sélections mémoïsées pour éviter les warnings de deps
   const dataOpenSelected = useMemo<Loan[]>(() => {
     if (query.length >= 2) {
       return onlyOpen
@@ -69,17 +67,17 @@ export default function HomeClient({
 
   return (
     <>
-      {/* Header + filtres */}
+      {/* Header + actions + filtres */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1
           className="text-3xl font-extrabold title-underline"
           style={{ fontFamily: "var(--font-title)" }}
         >
-          Fiches
+          Outils – Fiches de prêt
         </h1>
 
         <div className="flex items-center gap-3">
-          {/* Recherche (nom OU item) */}
+          {/* Recherche */}
           <div className="input-wrap">
             <input
               className="input input-icon w-64"
@@ -108,16 +106,38 @@ export default function HomeClient({
           />
         </div>
       </div>
+      {/* Actions */}
+          <div className="hidden sm:flex items-center gap-2 mr-2">
+            <Link className="btn" href="/loans/new">
+              <PlusCircle size={16} className="mr-1" aria-hidden />
+              Nouvelle fiche
+            </Link>
+            <Link className="btn" href="/history">
+              <History size={16} className="mr-1" aria-hidden />
+              Historique
+            </Link>
+          </div>
+      
+
+      {/* Actions visibles en mobile sous le header */}
+      <div className="sm:hidden flex gap-2">
+        <Link className="btn w-full justify-center" href="/loans/new">
+          <PlusCircle size={16} className="mr-2" />
+          Nouvelle fiche
+        </Link>
+        <Link className="btn w-full justify-center" href="/history">
+          <History size={16} className="mr-2" />
+          Historique
+        </Link>
+      </div>
 
       {onlyOpen ? (
-        // Mode “Uniquement ouvertes”
         dataOpenSelected.length === 0 ? (
           <div className="text-sm opacity-70 mt-2">Aucun résultat.</div>
         ) : (
           <LoansGrid loans={dataOpenSelected} query={query} />
         )
       ) : (
-        // Mode “Tout” → deux sections
         <div className="space-y-10">
           <section className="space-y-4">
             <h2 className="text-xl font-bold">En cours</h2>

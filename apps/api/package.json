@@ -7,7 +7,7 @@
     "build": "tsc -p tsconfig.json",
     "generate": "drizzle-kit generate",
     "migrate": "drizzle-kit migrate",
-    "start": "node dist/index.js" 
+    "start": "node dist/index.js"
   },
   "keywords": [],
   "author": "",

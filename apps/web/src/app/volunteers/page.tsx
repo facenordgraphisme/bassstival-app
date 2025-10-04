@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { FadeUp } from "@/components/FX";
-import { ClipboardList, Users } from "lucide-react";
+import { Users, CalendarClock, LayoutGrid } from "lucide-react";
 
 function Tile({
   href,
@@ -27,28 +27,33 @@ function Tile({
   );
 }
 
-export default function Page() {
+export default function VolunteersHome() {
   return (
     <FadeUp className="space-y-8">
       <h1
         className="text-3xl font-extrabold title-underline"
         style={{ fontFamily: "var(--font-title)" }}
       >
-        Bassstival • Tableau de bord
+        Bénévoles
       </h1>
-
-      <div className="grid sm:grid-cols-2 gap-4">
+      <div className="grid sm:grid-cols-3 gap-4">
         <Tile
-          href="/tools"
-          title="Outils (Prêts)"
-          desc="Créer et gérer les fiches de prêt, suivre les retours."
-          icon={<ClipboardList size={28} aria-hidden />}
+          href="/volunteers/list"
+          title="Liste des bénévoles"
+          desc="Ajouter, rechercher, filtrer par équipe."
+          icon={<Users size={28} aria-hidden />}
         />
         <Tile
-          href="/volunteers"
-          title="Bénévoles"
-          desc="Gérer les bénévoles, shifts et affectations."
-          icon={<Users size={28} aria-hidden />}
+          href="/volunteers/shifts"
+          title="Shifts"
+          desc="Créneaux par équipe, création/édition."
+          icon={<CalendarClock size={28} aria-hidden />}
+        />
+        <Tile
+          href="/volunteers/planning"
+          title="Planning"
+          desc="Affectations et suivi des postes."
+          icon={<LayoutGrid size={28} aria-hidden />}
         />
       </div>
     </FadeUp>
