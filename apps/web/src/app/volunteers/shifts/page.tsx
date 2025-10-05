@@ -12,7 +12,7 @@ export default async function ShiftsPage() {
     <FadeUp className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-extrabold title-underline" style={{ fontFamily: "var(--font-title)" }}>
-          Shifts bénévoles
+          Shifts bénévolesss
         </h1>
       </div>
 
