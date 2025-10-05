@@ -15,6 +15,20 @@
       "when": 1759562765970,
       "tag": "0001_familiar_thaddeus_ross",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1759660920049,
+      "tag": "0002_many_morbius",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1759670076034,
+      "tag": "0003_brainy_anthem",
+      "breakpoints": true
     }
   ]
 }

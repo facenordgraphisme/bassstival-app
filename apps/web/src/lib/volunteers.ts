@@ -1,7 +1,10 @@
 const BASE = process.env.NEXT_PUBLIC_API_URL!;
 
-// ---- Volunteers ----
+// ---- Bénévoles ----
 export type Team = "bar" | "billetterie" | "parking" | "bassspatrouille" | "tech" | "autre";
+
+// --- Check-in ---
+export type CheckStatus = "pending" | "in" | "done" | "no_show";
 
 export type Volunteer = {
   id: string;
@@ -25,6 +28,30 @@ export type Shift = {
   notes?: string | null;
   createdAt?: string | null;
 };
+
+export type AssignmentRow = {
+  assignmentId: string;
+  volunteerId: string;
+  assignedAt: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
+  phone: string | null;
+  team: Team;
+  status: CheckStatus;
+  checkinAt?: string | null;
+  checkoutAt?: string | null;
+};
+
+export type ShiftAssignments = {
+  shift: Shift;
+  shiftId: string;
+  assignments: AssignmentRow[];
+  used: number;
+  capacity: number;
+  remaining: number;
+};
+
 
 export async function listVolunteers(params?: { q?: string; team?: Team; order?: "asc" | "desc" }) {
   const usp = new URLSearchParams();
@@ -66,5 +93,63 @@ export async function updateVolunteer(id: string, patch: Partial<Omit<Volunteer,
 export async function deleteVolunteer(id: string) {
   const r = await fetch(`${BASE}/volunteers/${id}`, { method: "DELETE" });
   if (!r.ok) throw new Error("deleteVolunteer failed");
+  return r.json();
+}
+
+// lire les assignations (avec détails bénévoles) pour un shift
+export async function getShiftAssignments(shiftId: string) {
+  const r = await fetch(`${BASE}/volunteers/shifts/${shiftId}/assignments`, { cache: "no-store" });
+  if (!r.ok) throw new Error((await r.json().catch(() => null))?.error || "getShiftAssignments failed");
+  return r.json() as Promise<ShiftAssignments>;
+}
+
+// assigner
+export async function assignVolunteer(shiftId: string, volunteerId: string) {
+  const r = await fetch(`${BASE}/volunteers/assignments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ shiftId, volunteerId }),
+  });
+  if (!r.ok) throw new Error((await r.json().catch(() => null))?.error || "assignVolunteer failed");
+  return r.json();
+}
+
+// désassigner
+export async function unassignVolunteer(assignmentId: string) {
+  const r = await fetch(`${BASE}/volunteers/assignments/${assignmentId}`, { method: "DELETE" });
+  if (!r.ok) throw new Error((await r.json().catch(() => null))?.error || "unassignVolunteer failed");
+  return r.json();
+}
+
+// pointer "in"
+export async function checkInByAssignment(assignmentId: string) {
+  const r = await fetch(`${BASE}/volunteers/checkins`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "in", assignmentId }),
+  });
+  if (!r.ok) throw new Error((await r.json().catch(() => null))?.error || "check-in failed");
+  return r.json();
+}
+
+// pointer "out"
+export async function checkOutByAssignment(assignmentId: string) {
+  const r = await fetch(`${BASE}/volunteers/checkins`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "out", assignmentId }),
+  });
+  if (!r.ok) throw new Error((await r.json().catch(() => null))?.error || "check-out failed");
+  return r.json();
+}
+
+// marquer no-show
+export async function markNoShowByAssignment(assignmentId: string) {
+  const r = await fetch(`${BASE}/volunteers/checkins`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "no_show", assignmentId }),
+  });
+  if (!r.ok) throw new Error((await r.json().catch(() => null))?.error || "no-show failed");
   return r.json();
 }

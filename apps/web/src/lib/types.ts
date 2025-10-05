@@ -1,6 +1,6 @@
 export type ItemStatus = "open" | "returned";
 export type LoanStatus = "open" | "closed";
-export type Team = "bar" | "billetterie" | "parking" | "bassspatrouille" | "tech" | "autre";
+export type Team = "Bar" | "Billetterie" | "Parking" | "Bassspatrouille" | "Tech" | "Autre";
 
 export type LoanItem = {
   id: string;

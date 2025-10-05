@@ -1,0 +1,11 @@
+-- ALTER TABLE "shifts" ALTER COLUMN "team" SET DATA TYPE text;--> statement-breakpoint
+-- ALTER TABLE "users" ALTER COLUMN "team" SET DATA TYPE text;--> statement-breakpoint
+-- ALTER TABLE "volunteers" ALTER COLUMN "team" SET DATA TYPE text;--> statement-breakpoint
+-- ALTER TABLE "volunteers" ALTER COLUMN "team" SET DEFAULT 'autre'::text;--> statement-breakpoint
+-- DROP TYPE "public"."team";--> statement-breakpoint
+-- CREATE TYPE "public"."team" AS ENUM('bar', 'billetterie', 'parking', 'bassspatrouille', 'tech', 'autre');--> statement-breakpoint
+-- ALTER TABLE "shifts" ALTER COLUMN "team" SET DATA TYPE "public"."team" USING "team"::"public"."team";--> statement-breakpoint
+-- ALTER TABLE "users" ALTER COLUMN "team" SET DATA TYPE "public"."team" USING "team"::"public"."team";--> statement-breakpoint
+-- ALTER TABLE "volunteers" ALTER COLUMN "team" SET DEFAULT 'autre'::"public"."team";--> statement-breakpoint
+-- ALTER TABLE "volunteers" ALTER COLUMN "team" SET DATA TYPE "public"."team" USING "team"::"public"."team";--> statement-breakpoint
+CREATE UNIQUE INDEX "uq_checkins_assignment" ON "checkins" USING btree ("assignment_id");

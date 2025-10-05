@@ -1,0 +1,10 @@
+-- ALTER TABLE "shifts" ALTER COLUMN "team" SET DATA TYPE text;--> statement-breakpoint
+-- ALTER TABLE "users" ALTER COLUMN "team" SET DATA TYPE text;--> statement-breakpoint
+-- ALTER TABLE "volunteers" ALTER COLUMN "team" SET DATA TYPE text;--> statement-breakpoint
+-- ALTER TABLE "volunteers" ALTER COLUMN "team" SET DEFAULT 'Autre'::text;--> statement-breakpoint
+-- DROP TYPE "public"."team";--> statement-breakpoint
+-- CREATE TYPE "public"."team" AS ENUM('Bar', 'Billetterie', 'Parking', 'Bassspatrouille', 'Tech', 'Autre');--> statement-breakpoint
+-- ALTER TABLE "shifts" ALTER COLUMN "team" SET DATA TYPE "public"."team" USING "team"::"public"."team";--> statement-breakpoint
+-- ALTER TABLE "users" ALTER COLUMN "team" SET DATA TYPE "public"."team" USING "team"::"public"."team";--> statement-breakpoint
+-- ALTER TABLE "volunteers" ALTER COLUMN "team" SET DEFAULT 'Autre'::"public"."team";--> statement-breakpoint
+-- ALTER TABLE "volunteers" ALTER COLUMN "team" SET DATA TYPE "public"."team" USING "team"::"public"."team";

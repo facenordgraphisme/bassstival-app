@@ -4,8 +4,10 @@ import { useMemo, useState } from "react";
 import useSWR from "swr";
 import { toast } from "sonner";
 import { listShifts, createShift, deleteShift } from "@/lib/api";
-import type { Shift, Team } from "@/lib/volunteers";
-import { Plus, Trash2, Calendar, MapPin } from "lucide-react";
+import type { Shift } from "@/lib/volunteers";
+import { Plus, Trash2, Calendar, MapPin, ChevronDown, ChevronUp } from "lucide-react";
+import AssignmentsPanel from "./AssignmentsPanel";
+import { Team, TEAM_KEYS, TEAM_LABEL } from "@/lib/teams";
 
 const TEAMS: Team[] = ["bar", "billetterie", "parking", "bassspatrouille", "tech", "autre"];
 
@@ -18,6 +20,7 @@ export default function ShiftsClient({ initial }: { initial: Shift[] }) {
   const [team, setTeam] = useState<Team | "">("");
   const [from, setFrom] = useState<string>(""); // datetime-local
   const [to, setTo] = useState<string>("");     // datetime-local
+  const [openId, setOpenId] = useState<string | null>(null);
 
   // Create form
   const [showForm, setShowForm] = useState(false);
@@ -116,8 +119,8 @@ export default function ShiftsClient({ initial }: { initial: Shift[] }) {
             <label className="text-xs opacity-70 mb-1">Équipe</label>
             <select className="input" value={team} onChange={(e) => setTeam(e.target.value as Team | "")}>
               <option value="">Toutes</option>
-              {TEAMS.map((t) => (
-                <option key={t} value={t}>{t}</option>
+              {TEAM_KEYS.map((t) => (
+                <option key={t} value={t}>{TEAM_LABEL[t]}</option>
               ))}
             </select>
           </div>
@@ -242,9 +245,14 @@ export default function ShiftsClient({ initial }: { initial: Shift[] }) {
                 <div key={s.id} className="card neon space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="text-sm uppercase tracking-wide opacity-70">{s.team}</div>
-                    <button className="btn-ghost" onClick={() => onDelete(s.id)} title="Supprimer">
-                      <Trash2 size={16} />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button className="btn-ghost" onClick={() => setOpenId(openId === s.id ? null : s.id)}>
+                        {openId === s.id ? <ChevronUp size={16}/> : <ChevronDown size={16}/>} Gérer
+                      </button>
+                      <button className="btn-ghost" onClick={() => onDelete(s.id)} title="Supprimer">
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </div>
                   <div className="text-lg font-semibold">{s.title}</div>
                   <div className="text-sm flex items-center gap-2 opacity-80">
@@ -261,6 +269,11 @@ export default function ShiftsClient({ initial }: { initial: Shift[] }) {
                   </div>
                   <div className="text-sm opacity-80">Capacité: <strong>{s.capacity}</strong></div>
                   {s.notes && <div className="text-xs opacity-70">{s.notes}</div>}
+                  {openId === s.id && (
+                    <div className="mt-3 pt-3 border-t border-white/10">
+                      <AssignmentsPanel shiftId={s.id} team={s.team} />
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

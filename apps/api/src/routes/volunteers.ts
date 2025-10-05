@@ -16,6 +16,7 @@ import {
   lte,
   desc,
   asc,
+  sql,
 } from "drizzle-orm";
 
 const router = Router();
@@ -215,6 +216,7 @@ router.get("/shifts", async (req, res) => {
 /* ============ ASSIGNMENTS ============ */
 
 /** Assigner un bénévole à un shift */
+/** Assigner un bénévole à un shift (avec contrôle de capacité) */
 router.post("/assignments", async (req: Request, res: Response) => {
   try {
     const { shiftId, volunteerId } = (req.body as AssignBody) || {};
@@ -222,6 +224,23 @@ router.post("/assignments", async (req: Request, res: Response) => {
       return res.status(400).json({ error: "shiftId et volunteerId requis" });
     }
 
+    // 1) Vérifier que le shift existe
+    const [shift] = await db.select().from(shifts).where(eq(shifts.id, shiftId)).limit(1);
+    if (!shift) {
+      return res.status(404).json({ error: "Shift introuvable" });
+    }
+
+    // 2) Vérifier la capacité actuelle
+    const [{ count }] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(assignments)
+      .where(eq(assignments.shiftId, shiftId));
+
+    if (Number(count) >= shift.capacity) {
+      return res.status(409).json({ error: "Capacité du shift atteinte" });
+    }
+
+    // 3) Tenter l’insertion (la contrainte unique gère le doublon)
     try {
       const [a] = await db
         .insert(assignments)
@@ -241,6 +260,7 @@ router.post("/assignments", async (req: Request, res: Response) => {
   }
 });
 
+
 /** Lister les assignments (filtre par shiftId / volunteerId) */
 router.get("/assignments", async (req: Request, res: Response) => {
   try {
@@ -253,8 +273,22 @@ router.get("/assignments", async (req: Request, res: Response) => {
     const where = whereParts.length > 0 ? and(...whereParts) : undefined;
 
     const rows = await db
-      .select()
+      .select({
+        id: assignments.id,
+        assignedAt: assignments.assignedAt,
+        shiftId: assignments.shiftId,
+        volunteerId: assignments.volunteerId,
+        volunteerFirst: volunteers.firstName,
+        volunteerLast: volunteers.lastName,
+        volunteerTeam: volunteers.team,
+        shiftTitle: shifts.title,
+        shiftStart: shifts.startAt,
+        shiftEnd: shifts.endAt,
+        shiftCapacity: shifts.capacity,
+      })
       .from(assignments)
+      .leftJoin(volunteers, eq(assignments.volunteerId, volunteers.id))
+      .leftJoin(shifts, eq(assignments.shiftId, shifts.id))
       .where(where as any)
       .orderBy(desc(assignments.assignedAt));
 
@@ -378,6 +412,43 @@ router.delete("/:id", async (req: Request, res: Response) => {
 
     await db.delete(volunteers).where(eq(volunteers.id, id));
     return res.json({ ok: true });
+  } catch (e: any) {
+    return res.status(500).json({ error: e?.message || "Server error" });
+  }
+});
+
+// GET /volunteers/shifts/:id/assignments
+router.get("/shifts/:id/assignments", async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id || "";
+    if (!id) return res.status(400).json({ error: "id manquant" });
+
+    const [shift] = await db.select().from(shifts).where(eq(shifts.id, id)).limit(1);
+    if (!shift) return res.status(404).json({ error: "Shift introuvable" });
+
+    const rows = await db
+      .select({
+        assignmentId: assignments.id,
+        volunteerId: volunteers.id,
+        assignedAt: assignments.assignedAt,
+        firstName: volunteers.firstName,
+        lastName: volunteers.lastName,
+        email: volunteers.email,
+        phone: volunteers.phone,
+        team: volunteers.team,
+      })
+      .from(assignments)
+      .leftJoin(volunteers, eq(assignments.volunteerId, volunteers.id))
+      .where(eq(assignments.shiftId, id))
+      .orderBy(asc(volunteers.lastName), asc(volunteers.firstName));
+
+    return res.json({
+      shift,
+      assignments: rows,
+      used: rows.length,
+      capacity: shift.capacity,
+      remaining: Math.max(0, shift.capacity - rows.length),
+    });
   } catch (e: any) {
     return res.status(500).json({ error: e?.message || "Server error" });
   }

@@ -76,11 +76,15 @@ export const assignments = pgTable("assignments", {
 
 export const checkins = pgTable("checkins", {
   id: uuid("id").primaryKey().defaultRandom(),
-  assignmentId: uuid("assignment_id").references(() => assignments.id, { onDelete: "cascade" }).notNull(),
+  assignmentId: uuid("assignment_id")
+    .references(() => assignments.id, { onDelete: "cascade" })
+    .notNull(),
   checkinAt: timestamp("checkin_at"),
   checkoutAt: timestamp("checkout_at"),
   status: text("status").notNull().default("pending"), // pending|in|done|no_show
-});
+}, (t) => ({
+  uqAssignment: uniqueIndex("uq_checkins_assignment").on(t.assignmentId), // 👈 ajouté
+}));
 
 // --- (optionnel v2) utilisateurs + rôles --- //
 export const users = pgTable("users", {
