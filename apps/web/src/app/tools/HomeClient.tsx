@@ -7,6 +7,7 @@ import { listLoans, searchLoans } from "@/lib/api";
 import { Search, X, PlusCircle, History } from "lucide-react";
 import Link from "next/link";
 import type { Loan } from "@/lib/types";
+import BackButton from "@/components/BackButton";
 
 export default function HomeClient({
   initialOpen,
@@ -69,12 +70,15 @@ export default function HomeClient({
     <>
       {/* Header + actions + filtres */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1
-          className="text-3xl font-extrabold title-underline"
-          style={{ fontFamily: "var(--font-title)" }}
-        >
-          Outils – Fiches de prêt
-        </h1>
+        <div className="flex items-center gap-3">
+          <BackButton className="!px-2.5 !py-1.5 mt-2 mr-2" />
+          <h1
+            className="text-3xl font-extrabold title-underline"
+            style={{ fontFamily: "var(--font-title)" }}
+          >
+            Outils – Fiches de prêt
+          </h1>
+        </div>
 
         <div className="flex items-center gap-3">
           {/* Recherche */}

@@ -17,6 +17,9 @@ import {
   desc,
   asc,
   sql,
+  lt,
+  gt,
+  not,
 } from "drizzle-orm";
 
 const router = Router();
@@ -364,6 +367,70 @@ router.post("/checkins", async (req: Request, res: Response) => {
   }
 });
 
+router.get("/monitoring", async (req, res) => {
+  try {
+    const team = (req.query.team as Team | undefined) || undefined;
+    const from = parseDate(req.query.from);
+    const to   = parseDate(req.query.to);
+
+    // Construit les filtres SANS .where(undefined)
+    const filters: any[] = [];
+    if (team) filters.push(eq(shifts.team, team));
+
+    // Overlap tolérant:
+    // - from & to : end >= from AND start <= to
+    // - from seul : end >= from
+    // - to seul   : start <= to
+    if (from && to) {
+      filters.push(and(gte(shifts.endAt, from), lte(shifts.startAt, to)));
+    } else if (from) {
+      filters.push(gte(shifts.endAt, from));
+    } else if (to) {
+      filters.push(lte(shifts.startAt, to));
+    }
+
+    const base = db
+      .select({
+        id:       shifts.id,
+        team:     shifts.team,
+        title:    shifts.title,
+        startAt:  shifts.startAt,
+        endAt:    shifts.endAt,
+        capacity: shifts.capacity,
+        location: shifts.location,
+        notes:    shifts.notes,
+
+        assigned:  sql<number>`coalesce(count(distinct ${assignments.id}), 0)`.as("assigned"),
+        inCount:   sql<number>`coalesce(sum(case when ${checkins.status} = 'in' then 1 else 0 end), 0)`.as("inCount"),
+        doneCount: sql<number>`coalesce(sum(case when ${checkins.status} = 'done' then 1 else 0 end), 0)`.as("doneCount"),
+        noShow:    sql<number>`coalesce(sum(case when ${checkins.status} = 'no_show' then 1 else 0 end), 0)`.as("noShow"),
+      })
+      .from(shifts)
+      .leftJoin(assignments, eq(assignments.shiftId, shifts.id))
+      .leftJoin(checkins,   eq(checkins.assignmentId, assignments.id));
+
+    // Applique .where uniquement si on a des filtres
+    const q = filters.length > 0 ? base.where(and(...filters)) : base;
+
+    const rows = await q
+      .groupBy(
+        shifts.id,
+        shifts.team,
+        shifts.title,
+        shifts.startAt,
+        shifts.endAt,
+        shifts.capacity,
+        shifts.location,
+        shifts.notes
+      )
+      .orderBy(asc(shifts.startAt));
+
+    return res.json(rows);
+  } catch (e: any) {
+    return res.status(500).json({ error: e?.message || "Server error" });
+  }
+});
+
 /** Détail bénévole */
 router.get("/:id", async (req: Request, res: Response) => {
   try {
@@ -417,42 +484,62 @@ router.delete("/:id", async (req: Request, res: Response) => {
   }
 });
 
-// GET /volunteers/shifts/:id/assignments
+// === SHIFT ASSIGNMENTS (détail + statut pointage) ===
 router.get("/shifts/:id/assignments", async (req: Request, res: Response) => {
   try {
-    const id = req.params.id || "";
-    if (!id) return res.status(400).json({ error: "id manquant" });
+    const shiftId = req.params.id || "";
+    if (!shiftId) return res.status(400).json({ error: "id manquant" });
 
-    const [shift] = await db.select().from(shifts).where(eq(shifts.id, id)).limit(1);
-    if (!shift) return res.status(404).json({ error: "Shift introuvable" });
+    // 1) Shift de base (pour capacity)
+    const [s] = await db.select().from(shifts).where(eq(shifts.id, shiftId)).limit(1);
+    if (!s) return res.status(404).json({ error: "Shift introuvable" });
 
+    // 2) Assignations + status checkin
     const rows = await db
       .select({
         assignmentId: assignments.id,
-        volunteerId: volunteers.id,
-        assignedAt: assignments.assignedAt,
+        volunteerId: assignments.volunteerId,
         firstName: volunteers.firstName,
         lastName: volunteers.lastName,
         email: volunteers.email,
         phone: volunteers.phone,
-        team: volunteers.team,
+        // statut de pointage
+        status: checkins.status,         // "pending" | "in" | "done" | "no_show"
+        checkinAt: checkins.checkinAt,
+        checkoutAt: checkins.checkoutAt,
       })
       .from(assignments)
-      .leftJoin(volunteers, eq(assignments.volunteerId, volunteers.id))
-      .where(eq(assignments.shiftId, id))
+      .innerJoin(volunteers, eq(assignments.volunteerId, volunteers.id))
+      .leftJoin(checkins, eq(checkins.assignmentId, assignments.id))
+      .where(eq(assignments.shiftId, shiftId))
       .orderBy(asc(volunteers.lastName), asc(volunteers.firstName));
 
+    // 3) Compteurs
+    const used = rows.length;
+    const capacity = s.capacity ?? 0;
+    const remaining = Math.max(0, capacity - used);
+
     return res.json({
-      shift,
-      assignments: rows,
-      used: rows.length,
-      capacity: shift.capacity,
-      remaining: Math.max(0, shift.capacity - rows.length),
+      capacity,
+      used,
+      remaining,
+      assignments: rows.map(r => ({
+        assignmentId: r.assignmentId,
+        volunteerId: r.volunteerId,
+        firstName: r.firstName,
+        lastName: r.lastName,
+        email: r.email,
+        phone: r.phone,
+        status: r.status ?? "pending",
+        checkinAt: r.checkinAt ?? null,
+        checkoutAt: r.checkoutAt ?? null,
+      })),
     });
   } catch (e: any) {
     return res.status(500).json({ error: e?.message || "Server error" });
   }
 });
+
 
 /** Détail shift */
 router.get("/shifts/:id", async (req: Request, res: Response) => {
@@ -610,5 +697,6 @@ router.get("/export/csv", async (req: Request, res: Response) => {
     return res.status(500).json({ error: e?.message || "Server error" });
   }
 });
+
 
 export default router;

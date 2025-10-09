@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import useSWR from "swr";
 import { toast } from "sonner";
 import { listShifts, createShift, deleteShift } from "@/lib/api";
@@ -21,6 +21,14 @@ export default function ShiftsClient({ initial }: { initial: Shift[] }) {
   const [from, setFrom] = useState<string>(""); // datetime-local
   const [to, setTo] = useState<string>("");     // datetime-local
   const [openId, setOpenId] = useState<string | null>(null);
+
+  useEffect(() => {
+  if (typeof window === "undefined") return;
+  if (window.location.hash) {
+    const el = document.querySelector(window.location.hash);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+}, []);
 
   // Create form
   const [showForm, setShowForm] = useState(false);
@@ -242,7 +250,7 @@ export default function ShiftsClient({ initial }: { initial: Shift[] }) {
             <h2 className="text-lg font-bold">{dayLabel}</h2>
             <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
               {rows.map((s) => (
-                <div key={s.id} className="card neon space-y-2">
+                <div key={s.id} id={`shift-${s.id}`} className="card neon space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="text-sm uppercase tracking-wide opacity-70">{s.team}</div>
                     <div className="flex items-center gap-1">

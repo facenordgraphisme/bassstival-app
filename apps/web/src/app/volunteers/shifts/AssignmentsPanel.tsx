@@ -25,7 +25,7 @@ function StatusBadge({ status }: { status?: "pending" | "in" | "done" | "no_show
     pending: { label: "En attente", cls: "badge" },
     in: { label: "En poste", cls: "badge badge-green" },
     done: { label: "Terminé", cls: "badge" },
-    no_show: { label: "No-show", cls: "badge badge-red" },
+    no_show: { label: "Absent", cls: "badge badge-red" },
   };
   const m = map[s];
   return <span className={m.cls}>{m.label}</span>;
@@ -119,7 +119,7 @@ export default function AssignmentsPanel({
     try {
       await checkInByAssignment(assignmentId);
       toast.success("Pointage enregistré", { id: t });
-      mutate();
+      await mutate(undefined, { revalidate: true });
     } catch (e: any) {
       toast.error(e?.message || "Erreur check-in", { id: t });
     }
@@ -130,7 +130,7 @@ export default function AssignmentsPanel({
     try {
       await checkOutByAssignment(assignmentId);
       toast.success("Fin de shift enregistrée", { id: t });
-      mutate();
+      await mutate(undefined, { revalidate: true });
     } catch (e: any) {
       toast.error(e?.message || "Erreur check-out", { id: t });
     }
@@ -141,7 +141,7 @@ export default function AssignmentsPanel({
     try {
       await markNoShowByAssignment(assignmentId);
       toast.success("Marqué no-show", { id: t });
-      mutate();
+      await mutate(undefined, { revalidate: true });
     } catch (e: any) {
       toast.error(e?.message || "Erreur no-show", { id: t });
     }
@@ -187,7 +187,7 @@ export default function AssignmentsPanel({
                       {[a.firstName, a.lastName].filter(Boolean).join(" ") || "—"}
                     </div>
                     <div className="text-xs opacity-70 truncate">
-                      {a.email || a.phone || "—"}
+                      {a.phone || a.email || "—"}
                     </div>
                   </div>
                 </div>

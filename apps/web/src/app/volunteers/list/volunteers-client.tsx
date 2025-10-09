@@ -15,6 +15,8 @@ import { Team, TEAM_KEYS, TEAM_LABEL } from "@/lib/teams";
 
 import { Plus, Trash2, Search, Pencil } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { FadeUp } from "@/components/FX";
+import BackButton from "@/components/BackButton";
 
 const TEAMS: Team[] = ["bar", "billetterie", "parking", "bassspatrouille", "tech", "autre"];
 
@@ -138,7 +140,16 @@ export default function VolunteersClient() {
   }, [rows, order, showGrouped]);
 
   return (
-    <div className="space-y-6">
+    <FadeUp className="space-y-8">
+          <div className="flex items-center gap-3">
+            <BackButton className="!px-2.5 !py-1.5 mt-2 mr-2" />
+              <h1
+                className="text-3xl font-extrabold title-underline"
+                style={{ fontFamily: "var(--font-title)" }}
+              >
+            Liste des bénévoles
+            </h1>
+          </div>
       {/* Filtres */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="flex flex-col sm:flex-row gap-3">
@@ -245,6 +256,79 @@ export default function VolunteersClient() {
         </div>
       )}
 
+      {/* Vue non groupée (recherche ou filtre d’équipe actifs) */}
+{!showGrouped && (
+  <>
+    {/* Titre dynamique */}
+    {(team || q) && (
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-3">
+          <h2 className="text-xl font-bold capitalize">
+            {team
+              ? `Équipe : ${TEAM_LABEL[team as Team]}`
+              : "Résultats de la recherche"}
+          </h2>
+          {rows.length > 0 && <span className="badge">{rows.length}</span>}
+        </div>
+
+        <button
+          className="group flex items-center gap-2 rounded-full border border-yellow-500/50 bg-black/40 px-3 py-2 text-sm font-semibold text-yellow-400 transition-all hover:text-yellow-100 hover:border-yellow-400"
+          onClick={() => {
+            setTeam("");
+            setQ("");
+          }}
+        >
+          ← Retour à toutes les équipes
+        </button>
+      </div>
+    )}
+
+    {/* État vide */}
+    {!isLoading && rows.length === 0 && (
+      <div className="text-sm opacity-70">
+        Aucun bénévole {team ? `pour ${TEAM_LABEL[team as Team]}` : "correspondant à la recherche"}.
+      </div>
+    )}
+
+    {/* Grille des bénévoles filtrés */}
+    {rows.length > 0 && (
+      <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+        {[...rows]
+          .sort((a, b) => {
+            const an = `${a.lastName} ${a.firstName}`.toLowerCase();
+            const bn = `${b.lastName} ${b.firstName}`.toLowerCase();
+            return order === "asc" ? an.localeCompare(bn) : bn.localeCompare(an);
+          })
+          .map((v) => (
+            <div key={v.id} className="card neon space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="font-semibold">
+                  {v.firstName} {v.lastName}
+                </div>
+                <div className="flex gap-2">
+                  <button className="btn-ghost" onClick={() => openEdit(v)} title="Modifier">
+                    <Pencil size={16} />
+                  </button>
+                  <button className="btn-ghost" onClick={() => onDelete(v.id)} title="Supprimer">
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="text-xs opacity-70">
+                Équipe : <span className="font-medium">{TEAM_LABEL[v.team]}</span>
+              </div>
+              <div className="text-sm opacity-80">Email: {v.email || "—"}</div>
+              <div className="text-sm opacity-80">Téléphone: {v.phone || "—"}</div>
+              {v.notes && <div className="text-xs opacity-70">{v.notes}</div>}
+            </div>
+          ))}
+      </div>
+    )}
+  </>
+)}
+
+
       {/* Modale d’édition */}
       <Dialog open={!!editVolunteer} onOpenChange={(o) => !o && setEditVolunteer(null)}>
         <DialogContent className="max-w-md space-y-4">
@@ -279,6 +363,6 @@ export default function VolunteersClient() {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+    </FadeUp>
   );
 }

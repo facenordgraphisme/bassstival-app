@@ -1,15 +1,16 @@
 import { FadeUp } from "@/components/FX";
-import { listShifts } from "@/lib/api";
-import ShiftsClient from "./ShiftsClient";
-import type { Shift } from "@/lib/volunteers";
+import MonitoringClient from "./monitoring-client";
+import { listMonitoring } from "@/lib/volunteers";
 import BackButton from "@/components/BackButton";
+import BackButtonNeon from "@/components/BackButtonNeon";
+import BackButtonGold from "@/components/BackButtonGold";
 
 export const dynamic = "force-dynamic";
 
-export default async function ShiftsPage() {
-  let initial: Shift[] = [];
+export default async function MonitoringPage() {
+  let initial: Awaited<ReturnType<typeof listMonitoring>> = [];
   try {
-    initial = await listShifts();
+    initial = await listMonitoring();
   } catch {
     initial = [];
   }
@@ -17,15 +18,15 @@ export default async function ShiftsPage() {
   return (
     <FadeUp className="space-y-6">
       <div className="flex items-center gap-3">
-              <BackButton className="!px-2.5 !py-1.5 mt-2 mr-2" />
+              <BackButtonGold/>
                 <h1
                   className="text-3xl font-extrabold title-underline"
                   style={{ fontFamily: "var(--font-title)" }}
                 >
-              Shifts bénévoles
+              Monitoring bénévoles
               </h1>
             </div>
-      <ShiftsClient initial={initial} />
+      <MonitoringClient initial={initial} />
     </FadeUp>
   );
 }

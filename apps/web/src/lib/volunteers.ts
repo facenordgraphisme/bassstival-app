@@ -43,6 +43,18 @@ export type AssignmentRow = {
   checkoutAt?: string | null;
 };
 
+export type ShiftAssignmentRow = {
+  assignmentId: string;
+  volunteerId: string;
+  firstName: string;
+  lastName: string;
+  email?: string | null;
+  phone?: string | null;
+  status: "pending" | "in" | "done" | "no_show";
+  checkinAt?: string | null;
+  checkoutAt?: string | null;
+};
+
 export type ShiftAssignments = {
   shift: Shift;
   shiftId: string;
@@ -52,6 +64,21 @@ export type ShiftAssignments = {
   remaining: number;
 };
 
+export type MonitoringRow = {
+  id: string;
+  team: Team;
+  title: string;
+  startAt: string;
+  endAt: string;
+  capacity: number;
+  location?: string | null;
+  notes?: string | null;
+
+  assigned: number;
+  inCount: number;
+  doneCount: number;
+  noShow: number;
+};
 
 export async function listVolunteers(params?: { q?: string; team?: Team; order?: "asc" | "desc" }) {
   const usp = new URLSearchParams();
@@ -97,10 +124,10 @@ export async function deleteVolunteer(id: string) {
 }
 
 // lire les assignations (avec détails bénévoles) pour un shift
-export async function getShiftAssignments(shiftId: string) {
+export async function getShiftAssignments(shiftId: string): Promise<ShiftAssignments> {
   const r = await fetch(`${BASE}/volunteers/shifts/${shiftId}/assignments`, { cache: "no-store" });
-  if (!r.ok) throw new Error((await r.json().catch(() => null))?.error || "getShiftAssignments failed");
-  return r.json() as Promise<ShiftAssignments>;
+  if (!r.ok) throw new Error("getShiftAssignments failed");
+  return r.json();
 }
 
 // assigner
@@ -152,4 +179,14 @@ export async function markNoShowByAssignment(assignmentId: string) {
   });
   if (!r.ok) throw new Error((await r.json().catch(() => null))?.error || "no-show failed");
   return r.json();
+}
+
+export async function listMonitoring(params?: { team?: Team; from?: string; to?: string }) {
+  const usp = new URLSearchParams();
+  if (params?.team) usp.set("team", params.team);
+  if (params?.from) usp.set("from", params.from);
+  if (params?.to)   usp.set("to",   params.to);
+  const r = await fetch(`${BASE}/volunteers/monitoring${usp.toString() ? `?${usp.toString()}` : ""}`, { cache: "no-store" });
+  if (!r.ok) throw new Error("listMonitoring failed");
+  return r.json() as Promise<MonitoringRow[]>;
 }

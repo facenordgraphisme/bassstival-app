@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { FadeUp } from "@/components/FX";
-import { Users, CalendarClock, LayoutGrid } from "lucide-react";
+import { Users, CalendarClock, LayoutGrid, LucideView } from "lucide-react";
+import BackButton from "@/components/BackButton";
 
 function Tile({
   href,
@@ -30,12 +31,15 @@ function Tile({
 export default function VolunteersHome() {
   return (
     <FadeUp className="space-y-8">
-      <h1
-        className="text-3xl font-extrabold title-underline"
-        style={{ fontFamily: "var(--font-title)" }}
-      >
+      <div className="flex items-center gap-3">
+        <BackButton className="!px-2.5 !py-1.5 mt-2 mr-2" />
+          <h1
+            className="text-3xl font-extrabold title-underline"
+            style={{ fontFamily: "var(--font-title)" }}
+          >
         Bénévoles
-      </h1>
+        </h1>
+      </div>
       <div className="grid sm:grid-cols-3 gap-4">
         <Tile
           href="/volunteers/list"
@@ -54,6 +58,12 @@ export default function VolunteersHome() {
           title="Planning"
           desc="Affectations et suivi des postes."
           icon={<LayoutGrid size={28} aria-hidden />}
+        />
+        <Tile
+          href="/volunteers/monitoring"
+          title="Temps réel"
+          desc="Shifts en direct"
+          icon={<LucideView size={28} aria-hidden />}
         />
       </div>
     </FadeUp>
