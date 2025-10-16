@@ -20,6 +20,10 @@ import BackButton from "@/components/BackButton";
 
 const TEAMS: Team[] = ["bar", "billetterie", "parking", "bassspatrouille", "tech", "autre"];
 
+function errMsg(e: unknown): string {
+  return e instanceof Error ? e.message : "Erreur";
+}
+
 export default function VolunteersClient() {
   const [q, setQ] = useState("");
   const [team, setTeam] = useState<Team | "">("");
@@ -61,8 +65,8 @@ export default function VolunteersClient() {
       setShowForm(false);
       setForm({ firstName: "", lastName: "", phone: "", email: "", notes: "", team: "" });
       mutate();
-    } catch (e: any) {
-      toast.error(e.message || "Erreur création", { id: t });
+    } catch (e: unknown) {
+      toast.error(errMsg(e), { id: t });
     }
   };
 
@@ -104,8 +108,8 @@ export default function VolunteersClient() {
       toast.success("Modifié ✅", { id: t });
       setEditVolunteer(null);
       mutate();
-    } catch (e: any) {
-      toast.error(e.message || "Erreur mise à jour", { id: t });
+    } catch (e: unknown) {
+      toast.error(errMsg(e), { id: t });
     }
   };
 
@@ -115,8 +119,8 @@ export default function VolunteersClient() {
       await deleteVolunteer(id);
       toast.success("Supprimé", { id: t });
       mutate();
-    } catch (e: any) {
-      toast.error(e.message || "Erreur suppression", { id: t });
+    } catch (e: unknown) {
+      toast.error(errMsg(e), { id: t });
     }
   };
 

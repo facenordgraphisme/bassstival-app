@@ -27,6 +27,11 @@ import { STAGE_LABEL } from "@/lib/utils-booking";
 import { confirmWithSonner } from "@/components/confirmWithSonner";
 import { useRouter } from "next/navigation";
 
+// Petit helper pour respecter no-explicit-any
+function errMsg(e: unknown): string {
+  return e instanceof Error ? e.message : "Erreur";
+}
+
 export default function ArtistDetailsClient({
   initialArtist,
   initialBookings,
@@ -37,7 +42,7 @@ export default function ArtistDetailsClient({
   const artistId = initialArtist.id;
   const router = useRouter();
 
-  // Onglets (inclure log & finance)
+  // Onglets
   const [tab, setTab] = useState<"infos" | "contacts" | "bookings" | "log" | "finance" | "notes">("infos");
 
   // SWR artiste
@@ -80,8 +85,8 @@ export default function ArtistDetailsClient({
       });
       toast.success("Infos mises à jour", { id: t });
       mutateArtist();
-    } catch (e: any) {
-      toast.error(e?.message || "Erreur", { id: t });
+    } catch (e: unknown) {
+      toast.error(errMsg(e), { id: t });
     }
   };
 
@@ -106,8 +111,8 @@ export default function ArtistDetailsClient({
       });
       toast.success("Logistique mise à jour", { id: t });
       mutateArtist();
-    } catch (e: any) {
-      toast.error(e?.message || "Erreur", { id: t });
+    } catch (e: unknown) {
+      toast.error(errMsg(e), { id: t });
     }
   };
 
@@ -123,8 +128,8 @@ export default function ArtistDetailsClient({
       await updateArtist(artistId, { feeAmount: cents, feeCurrency: "EUR" });
       toast.success("Cachet mis à jour", { id: t });
       mutateArtist();
-    } catch (e: any) {
-      toast.error(e?.message || "Erreur", { id: t });
+    } catch (e: unknown) {
+      toast.error(errMsg(e), { id: t });
     }
   };
 
@@ -145,8 +150,8 @@ export default function ArtistDetailsClient({
       setNewCost({ label: "", amount: "" });
       toast.success("Coût ajouté", { id: t });
       mutateArtistCosts();
-    } catch (e: any) {
-      toast.error(e?.message || "Erreur", { id: t });
+    } catch (e: unknown) {
+      toast.error(errMsg(e), { id: t });
     }
   };
 
@@ -168,8 +173,8 @@ export default function ArtistDetailsClient({
       await updateArtist(artistId, { notes: notes || null });
       toast.success("Notes enregistrées", { id: t });
       mutateArtist();
-    } catch (e: any) {
-      toast.error(e?.message || "Erreur", { id: t });
+    } catch (e: unknown) {
+      toast.error(errMsg(e), { id: t });
     }
   };
 
@@ -193,8 +198,8 @@ export default function ArtistDetailsClient({
       toast.success("Contact ajouté", { id: t });
       setNewContact({ name: "", role: "", email: "", phone: "", isPrimary: false });
       mutateArtist();
-    } catch (e: any) {
-      toast.error(e?.message || "Erreur", { id: t });
+    } catch (e: unknown) {
+      toast.error(errMsg(e), { id: t });
     }
   };
 

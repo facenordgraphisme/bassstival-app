@@ -44,6 +44,10 @@ function StatusBadge({ status }: { status: ArtistStatus }) {
   return <span className={`inline-flex items-center gap-1 ${ARTIST_STATUS_BADGE[status]}`}>{ARTIST_STATUS_LABEL[status]}</span>;
 }
 
+function errMsg(e: unknown): string {
+  return e instanceof Error ? e.message : "Erreur";
+}
+
 export default function ArtistsClient() {
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<ArtistStatus | "">("");
@@ -77,8 +81,8 @@ export default function ArtistsClient() {
       toast.success("Artiste créé", { id: t });
       setShowForm(false);
       setForm({ name: "", genre: "", agency: "", status: "prospect" });
-    } catch (e: any) {
-      toast.error(e?.message || "Erreur", { id: t });
+    } catch (e: unknown) {
+      toast.error(errMsg(e), { id: t });
     }
   };
 
@@ -91,9 +95,9 @@ export default function ArtistsClient() {
       await updateArtist(artist.id, { status: next });
       toast.success("Statut mis à jour");
       mutate();
-    } catch (e:any) {
+    } catch (e:unknown) {
       mutate(prev, { revalidate: false });
-      toast.error(e?.message || "Erreur");
+      // toast.error(e?.message || "Erreur");
     }
   };
 

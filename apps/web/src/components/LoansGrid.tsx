@@ -19,6 +19,10 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 
+function errMsg(e: unknown): string {
+  return e instanceof Error ? e.message : "Erreur";
+}
+
 export default function LoansGrid({
   loans,
   query = "",
@@ -62,8 +66,8 @@ export default function LoansGrid({
       setEditingId(null);
       // revalider les listes
       await Promise.all([mutate(["loans", "open"]), mutate(["loans", "all"])]);
-    } catch (e: any) {
-      toast.error(e?.message || "Erreur", { id: t });
+    } catch (e: unknown) {
+      toast.error(errMsg(e), { id: t });
     }
   };
 
@@ -73,8 +77,8 @@ export default function LoansGrid({
       await forceClose(l.id);
       toast.success("Fiche clôturée", { id: t });
       await Promise.all([mutate(["loans", "open"]), mutate(["loans", "all"])]);
-    } catch (e: any) {
-      toast.error(e?.message || "Erreur", { id: t });
+    } catch (e: unknown) {
+      toast.error(errMsg(e), { id: t });
     }
   };
 

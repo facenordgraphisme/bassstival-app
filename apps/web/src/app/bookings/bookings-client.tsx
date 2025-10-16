@@ -32,6 +32,10 @@ const STAGE_LABEL: Record<Stage, string> = {
   second: "Alternative stage",
 };
 
+function errMsg(e: unknown): string {
+  return e instanceof Error ? e.message : "Erreur";
+}
+
 export default function BookingsClient({ initialArtistId = "" }: { initialArtistId?: string }) {
   const [from, setFrom] = useState<string>("");
   const [to, setTo] = useState<string>("");
@@ -135,8 +139,8 @@ export default function BookingsClient({ initialArtistId = "" }: { initialArtist
       toast.success("Booking mis à jour", { id: t });
       setEditingId(null);
       mutate();
-    } catch (e: any) {
-      toast.error(e?.message || "Erreur", { id: t });
+    } catch (e: unknown) {
+      toast.error(errMsg(e), { id: t });
     }
   };
 

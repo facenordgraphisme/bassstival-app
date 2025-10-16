@@ -70,7 +70,7 @@ export default function PlanningGridClient() {
 
   const dayEnd = useMemo(() => {
     const d = new Date(day);
-    let eh = endHour;
+    const eh = endHour;
     if (endHour <= startHour) {
       // endHour “le lendemain”
       d.setDate(d.getDate() + 1);

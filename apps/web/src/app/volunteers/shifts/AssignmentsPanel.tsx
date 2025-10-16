@@ -17,6 +17,10 @@ import {
 } from "@/lib/volunteers";
 import { CheckCircle, DoorOpen, EyeOff, X, UserPlus } from "lucide-react";
 
+function errMsg(e: unknown): string {
+  return e instanceof Error ? e.message : "Erreur";
+}
+
 /* ---------- Petits composants ---------- */
 
 function StatusBadge({ status }: { status?: "pending" | "in" | "done" | "no_show" }) {
@@ -109,8 +113,8 @@ export default function AssignmentsPanel({
       await unassignVolunteer(assignmentId);
       toast.success("Bénévole retiré", { id: t });
       mutate();
-    } catch (e: any) {
-      toast.error(e?.message || "Erreur suppression", { id: t });
+    } catch (e: unknown) {
+      toast.error(errMsg(e), { id: t });
     }
   };
 
@@ -120,8 +124,8 @@ export default function AssignmentsPanel({
       await checkInByAssignment(assignmentId);
       toast.success("Pointage enregistré", { id: t });
       await mutate(undefined, { revalidate: true });
-    } catch (e: any) {
-      toast.error(e?.message || "Erreur check-in", { id: t });
+    } catch (e: unknown) {
+      toast.error(errMsg(e), { id: t });
     }
   };
 
@@ -131,8 +135,8 @@ export default function AssignmentsPanel({
       await checkOutByAssignment(assignmentId);
       toast.success("Fin de shift enregistrée", { id: t });
       await mutate(undefined, { revalidate: true });
-    } catch (e: any) {
-      toast.error(e?.message || "Erreur check-out", { id: t });
+    } catch (e: unknown) {
+      toast.error(errMsg(e), { id: t });
     }
   };
 
@@ -142,8 +146,8 @@ export default function AssignmentsPanel({
       await markNoShowByAssignment(assignmentId);
       toast.success("Marqué no-show", { id: t });
       await mutate(undefined, { revalidate: true });
-    } catch (e: any) {
-      toast.error(e?.message || "Erreur no-show", { id: t });
+    } catch (e: unknown) {
+      toast.error(errMsg(e), { id: t });
     }
   };
 

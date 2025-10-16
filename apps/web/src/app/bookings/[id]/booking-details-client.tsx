@@ -20,6 +20,10 @@ import type { Stage, } from "@/lib/artists";
 import Link from "next/link";
 import { getArtist, type ArtistWithContacts } from "@/lib/artists";
 
+function errMsg(e: unknown): string {
+  return e instanceof Error ? e.message : "Erreur";
+}
+
 export default function BookingDetailsClient({ initial }: { initial: Booking & { costs: BookingCost[] } }) {
   const bookingId = initial.id;
 
@@ -63,8 +67,8 @@ export default function BookingDetailsClient({ initial }: { initial: Booking & {
         endAt: new Date(formTiming.endAt).toISOString(),
       });
       toast.success("Timing mis à jour", { id: t });
-    } catch (e: any) {
-      toast.error(e?.message || "Erreur", { id: t });
+    } catch (e: unknown) {
+      toast.error(errMsg(e), { id: t });
     }
   };
 
@@ -88,8 +92,8 @@ export default function BookingDetailsClient({ initial }: { initial: Booking & {
         pickupLocation: formLog.pickupLocation || null,
       });
       toast.success("Logistique mise à jour", { id: t });
-    } catch (e: any) {
-      toast.error(e?.message || "Erreur", { id: t });
+    } catch (e: unknown) {
+      toast.error(errMsg(e), { id: t });
     }
   };
 
@@ -118,8 +122,8 @@ export default function BookingDetailsClient({ initial }: { initial: Booking & {
         pickupLocation: artist.pickupLocation ?? null,
       });
       toast.success("Logistique importée depuis l’artiste", { id: t });
-    } catch (e: any) {
-      toast.error(e?.message || "Erreur", { id: t });
+    } catch (e: unknown) {
+      toast.error(errMsg(e), { id: t });
     }
   };
 
@@ -131,8 +135,8 @@ export default function BookingDetailsClient({ initial }: { initial: Booking & {
     try {
       await updateBooking(bookingId, { feeAmount: cents, feeCurrency: "EUR" });
       toast.success("Cachet mis à jour", { id: t });
-    } catch (e: any) {
-      toast.error(e?.message || "Erreur", { id: t });
+    } catch (e: unknown) {
+      toast.error(errMsg(e), { id: t });
     }
   };
 
@@ -148,8 +152,8 @@ export default function BookingDetailsClient({ initial }: { initial: Booking & {
       setFee(artist.feeAmount ? (artist.feeAmount / 100).toFixed(2) : "");
       await updateBooking(bookingId, { feeAmount: cents, feeCurrency: artist.feeCurrency ?? "EUR" });
       toast.success("Finances importées depuis l’artiste", { id: t });
-    } catch (e: any) {
-      toast.error(e?.message || "Erreur", { id: t });
+    } catch (e: unknown) {
+      toast.error(errMsg(e), { id: t });
     }
   };
 
@@ -163,8 +167,8 @@ export default function BookingDetailsClient({ initial }: { initial: Booking & {
       setNewCost({ label: "", amount: "" });
       toast.success("Coût ajouté", { id: t });
       mutateCosts();
-    } catch (e: any) {
-      toast.error(e?.message || "Erreur", { id: t });
+    } catch (e: unknown) {
+      toast.error(errMsg(e), { id: t });
     }
   };
 
