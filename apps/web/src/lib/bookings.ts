@@ -1,7 +1,7 @@
 // src/lib/bookings.ts
 import type { Stage } from "./artists";
 
-const BASE = process.env.NEXT_PUBLIC_API_URL!;
+const BASE = process.env.NEXT_PUBLIC_API_URL! + "/artists-api";
 
 // ---- Statuts de booking (source unique) ----
 export type BookingStatus = "draft" | "confirmed" | "played" | "canceled";

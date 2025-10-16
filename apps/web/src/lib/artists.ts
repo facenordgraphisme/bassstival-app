@@ -1,5 +1,5 @@
 // src/lib/artists.ts
-const BASE = process.env.NEXT_PUBLIC_API_URL!;
+const BASE = process.env.NEXT_PUBLIC_API_URL! + "/artists-api";
 
 export type ArtistStatus = "prospect" | "pending" | "confirmed" | "canceled";
 export type Stage = "main" | "second" ;
