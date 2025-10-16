@@ -26,9 +26,11 @@ function errMsg(e: unknown): string {
 export default function LoansGrid({
   loans,
   query = "",
+  showClosed = false,
 }: {
   loans: (Loan & { matchedItems?: string[] })[];
   query?: string;
+  showClosed?: boolean;
 }) {
   const { mutate } = useSWRConfig();
   const [editingId, setEditingId] = useState<string | null>(null);
