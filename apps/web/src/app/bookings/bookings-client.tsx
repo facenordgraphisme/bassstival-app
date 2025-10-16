@@ -15,7 +15,7 @@ import {
 import { listArtists, type Artist, type Stage } from "@/lib/artists";
 import { toast } from "sonner";
 import { confirmWithSonner } from "@/components/confirmWithSonner";
-import { MoreHorizontal, Pencil, Trash2, Check } from "lucide-react";
+import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 
 // shadcn/ui
 import {

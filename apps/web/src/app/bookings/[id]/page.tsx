@@ -6,6 +6,7 @@ import { getArtist } from "@/lib/artists";
 import BookingDetailsClient from "./booking-details-client";
 
 type Params = { id: string };
+type InitialBooking = Awaited<ReturnType<typeof getBooking>>;
 
 export default async function BookingDetailsPage({
   params,
@@ -14,7 +15,7 @@ export default async function BookingDetailsPage({
 }) {
   const { id } = await params; // 👈 on attend params
 
-  let initial: any = null;
+  let initial: InitialBooking | null = null;
   let artistName: string | null = null;
 
   try {

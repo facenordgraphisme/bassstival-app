@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { FadeUp } from "@/components/FX";
 import BackButton from "@/components/BackButton";
-import { Music3, CalendarClock, LayoutGrid, Printer } from "lucide-react";
+import { Music3, CalendarClock, LayoutGrid } from "lucide-react";
 
 function Tile({
   href, title, desc, icon,

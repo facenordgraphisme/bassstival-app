@@ -13,7 +13,7 @@ import {
   ARTIST_STATUS,
   ARTIST_STATUS_LABEL,
 } from "@/lib/artists";
-import { Search, Plus, MoreHorizontal, CalendarPlus, ExternalLink, Trash2, Check } from "lucide-react";
+import { Search, Plus, MoreHorizontal, CalendarPlus, ExternalLink, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { confirmWithSonner } from "@/components/confirmWithSonner";
 
@@ -25,11 +25,6 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubTrigger,
-  DropdownMenuSubContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
 } from "@/components/ui/dropdown-menu";
 
 // Badges (couleurs dispo dans ton global.css)

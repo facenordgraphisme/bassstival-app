@@ -85,7 +85,6 @@ export default function MonitoringClient({ initial }: { initial: MonitoringRow[]
             {rows.map(r => {
               const now = Date.now();
               const st = statusFor(now, r.startAt, r.endAt);
-              const progress = Math.min(100, Math.round((r.inCount / Math.max(1, r.capacity)) * 100));
               const assignedPct = Math.min(100, Math.round((r.assigned / Math.max(1, r.capacity)) * 100));
               return (
                 <div key={r.id} className="card neon space-y-2">

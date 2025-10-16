@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X, LayoutDashboard, ClipboardList, Users, Music3, CalendarClock } from "lucide-react";
+import { Menu, X, LayoutDashboard, ClipboardList, Users, Music3 } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import Brand from "@/components/Brand";
 

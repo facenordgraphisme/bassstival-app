@@ -3,8 +3,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
-import Link from "next/link";
-import { toast } from "sonner";
 import { Download, Printer, RefreshCw } from "lucide-react";
 import type { Team, Shift, ShiftAssignments } from "@/lib/volunteers";
 import { getShiftAssignments } from "@/lib/volunteers";

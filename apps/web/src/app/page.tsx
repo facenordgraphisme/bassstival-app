@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { FadeUp } from "@/components/FX";
-import { ClipboardList, Users, Music3, CalendarClock } from "lucide-react";
+import { ClipboardList, Users, Music3 } from "lucide-react";
 
 function Tile({ href, title, desc, icon }: { href: string; title: string; desc: string; icon: React.ReactNode; }) {
   return (

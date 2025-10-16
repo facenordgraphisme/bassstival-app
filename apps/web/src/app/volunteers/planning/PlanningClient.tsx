@@ -3,11 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import Link from "next/link";
-import { toast } from "sonner";
 import { Download, Printer, RefreshCw, Calendar, MapPin, Users } from "lucide-react";
 import {
-  listMonitoring, // on ne l'utilise pas ici, mais dispo si tu veux des compteurs
-  listVolunteers,
   getShiftAssignments,
   type Team,
   type Shift,

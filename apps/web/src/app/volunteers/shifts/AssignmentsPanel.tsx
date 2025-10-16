@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import useSWR from "swr";
 import { toast } from "sonner";
 import {
@@ -82,7 +82,6 @@ export default function AssignmentsPanel({
   );
 
   // ----- Actions -----
-
   const add = async () => {
     if (!selected) {
       toast.error("Sélectionne un bénévole");
@@ -94,9 +93,14 @@ export default function AssignmentsPanel({
       toast.success("Bénévole assigné", { id: t });
       setSelected("");
       mutate();
-    } catch (e: any) {
-      const msg = String(e?.message || "");
-      // message renvoyé par l’API si capacité atteinte ou doublon
+    } catch (e: unknown) {                          // ✅ plus de any
+      const msg =
+        e instanceof Error
+          ? e.message
+          : typeof e === "string"
+          ? e
+          : "Erreur assignation";
+
       if (msg.toLowerCase().includes("capacité")) {
         toast.error("Capacité atteinte pour ce shift.", { id: t });
       } else if (msg.toLowerCase().includes("déjà assigné")) {

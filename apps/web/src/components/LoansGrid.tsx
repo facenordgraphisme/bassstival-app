@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useSWRConfig } from "swr";
 import type { Loan } from "@/lib/types";
 import { forceClose, updateLoan, deleteLoan } from "@/lib/api";
@@ -26,11 +26,9 @@ function errMsg(e: unknown): string {
 export default function LoansGrid({
   loans,
   query = "",
-  showClosed = false,
 }: {
   loans: (Loan & { matchedItems?: string[] })[];
   query?: string;
-  showClosed?: boolean;
 }) {
   const { mutate } = useSWRConfig();
   const [editingId, setEditingId] = useState<string | null>(null);

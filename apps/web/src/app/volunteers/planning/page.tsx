@@ -1,5 +1,4 @@
 import { FadeUp } from "@/components/FX";
-import PlanningClient from "./PlanningClient";
 import PlanningGridClient from "./PlanningGridClient";
 
 export const dynamic = "force-dynamic";

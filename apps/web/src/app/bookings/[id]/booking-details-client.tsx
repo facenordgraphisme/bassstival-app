@@ -61,7 +61,7 @@ export default function BookingDetailsClient({ initial }: { initial: Booking & {
     const t = toast.loading("Sauvegarde…");
     try {
       await updateBooking(bookingId, {
-        stage: formTiming.stage as any,
+        stage: formTiming.stage,
         status: formTiming.status,
         startAt: new Date(formTiming.startAt).toISOString(),
         endAt: new Date(formTiming.endAt).toISOString(),
