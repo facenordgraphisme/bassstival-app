@@ -1,6 +1,10 @@
 import type { Shift, Team } from "./volunteers";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL!;
+if (!BASE || !/^https?:\/\//i.test(BASE)) {
+  // Evite les crashs obscurs en prod
+  console.error("[lib/api] NEXT_PUBLIC_API_URL invalide:", BASE);
+}
 
 // --- Types ---
 export type Loan = {
@@ -24,24 +28,23 @@ export type LoanItem = {
 
 // --- Helper générique pour typer les fetch ---
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const r = await fetch(`${BASE}${path}`, {
+  const url = `${BASE}${path}`;
+  const r = await fetch(url, {
     cache: "no-store",
     headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
     ...init,
   });
 
   if (!r.ok) {
-    let msg = `Request failed: ${r.status} ${r.statusText}`;
+    let msg = `Request failed: ${r.status} ${r.statusText} @ ${url}`;
     try {
       const body = await r.json();
       if (body?.error) msg += ` – ${body.error}`;
     } catch {}
     throw new Error(msg);
   }
-
   return r.json() as Promise<T>;
 }
-
 // --- API typée ---
 export function listLoans(status?: "open" | "closed"): Promise<Loan[]> {
   const q = status ? `?status=${status}` : "";
