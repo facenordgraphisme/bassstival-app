@@ -202,8 +202,8 @@ html, body { background: var(--bg); color: var(--fg); }
   border-color: color-mix(in srgb, var(--fg) 20%, transparent);
   background: color-mix(in srgb, #090b10 70%, var(--vio) 30%);
 }
-.badge-green { background: color-mix(in srgb, #0b1210 70%, #27ffa8 30%); color:#02170e; }
-.badge-red   { background: color-mix(in srgb, #140b0b 70%, #ff6b6b 30%); color:#1a0404; }
+.badge-green {@apply text-xs px-2 py-1 rounded-full border ; background: color-mix(in srgb, #0b1210 70%, #27ffa8 30%); color:#ffffff;border-color: color-mix(in srgb, var(--fg) 20%, transparent); }
+.badge-red   {@apply text-xs px-2 py-1 rounded-full border; background: color-mix(in srgb, #140b0b 70%, #ff6b6b 30%); color:#ffffff; border-color: color-mix(in srgb, var(--fg) 20%, transparent); }
 
 /* Animated gradient line (under titles) */
 .title-underline {
@@ -263,7 +263,7 @@ header {
   --background: #0a0a0a;
   --foreground: #ededed;
   --cyan: #00fff7;
-  --accent: #ff00aa; /* par défaut : rose néon */
+  --accent: #38a9bd; /* par défaut : rose néon */
   --muted: #888;
 }
 
@@ -272,7 +272,7 @@ header {
 }
 
 [data-theme="rose"] {
-  --accent: #ff00aa; /* rose néon */
+  --accent: #38a9bd; /* rose néon */
 }
 
 /* Neon toggle switch */
@@ -359,4 +359,49 @@ header {
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* --- PRINT ONLY --- */
+@media print {
+  /* fond blanc & texte noir pour lisibilité */
+  html, body { background: #fff !important; color: #000 !important; }
+  /* cache la navbar / boutons / éléments décoratifs */
+  header, .no-print, .btn, .btn-ghost { display: none !important; }
+  /* cartes/ombres neutralisées */
+  .card, .neon, .lift { background: #fff !important; box-shadow: none !important; border: 1px solid #000 !important; }
+  /* liens sobres */
+  a { color: #000 !important; text-decoration: none !important; }
+  /* page A4 marges */
+  @page { size: A4; margin: 12mm; }
+}
+
+/* meilleure lisibilité à l’écran pour la page print */
+.print-page {
+  background: #0b0b0f;
+}
+.print-sheet {
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 12px;
+  padding: 16px;
+}
+.print-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.print-table th, .print-table td {
+  border-bottom: 1px dashed rgba(255,255,255,0.15);
+  padding: 8px 6px;
+  vertical-align: top;
+}
+.print-table th {
+  text-align: left;
+  opacity: .8;
+  font-weight: 700;
+}
+.print-note {
+  opacity: .8;
+  font-size: 12px;
+  white-space: pre-wrap;
 }

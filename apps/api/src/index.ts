@@ -3,6 +3,7 @@ import express from "express";
 import cors from "cors";
 import loansRouter from "./routes/loans";
 import volunteersRouter from "./routes/volunteers";
+import artistsRouter from "./routes/artists";
 
 const app = express();
 
@@ -26,6 +27,7 @@ app.use(express.json());
 app.get("/health", (_, res) => res.json({ ok: true }));
 app.use("/loans", loansRouter);
 app.use("/volunteers", volunteersRouter);
+app.use("/artists-api", artistsRouter);
 
 const PORT = Number(process.env.PORT) || 8000;
 app.listen(PORT, () => {

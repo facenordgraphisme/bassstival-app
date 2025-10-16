@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, integer, timestamp, pgEnum,uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, integer, timestamp, pgEnum,uniqueIndex, boolean, numeric } from "drizzle-orm/pg-core";
 
 
 export const loanStatus = pgEnum("loan_status", ["open", "closed"]);
@@ -94,4 +94,75 @@ export const users = pgTable("users", {
   role: roleEnum("role").notNull().default("staff"),
   team: teamEnum("team"), // Ex: chef d’équipe limité à son team
   createdAt: timestamp("created_at").defaultNow(),
+});
+
+// BOOKING ARTISTES
+
+export const artistStatus = pgEnum("artist_status", ["prospect", "pending", "confirmed", "canceled"]);
+export const bookingStatus = pgEnum("booking_status", ["draft", "confirmed", "played", "canceled"]);
+export const stageEnum = pgEnum("stage", ["main", "second", "vip"]);
+export const currencyEnum = pgEnum("currency", ["EUR"]); // extensible
+
+export const artists = pgTable("artists", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  genre: text("genre"),
+  agency: text("agency"),
+  status: artistStatus("status").notNull().default("prospect"),
+  notes: text("notes"),
+  feeAmount: integer("fee_amount"),                 // en cents
+  feeCurrency: currencyEnum("fee_currency").default("EUR"),
+  hospitalityNotes: text("hospitality_notes"),
+  techRider: text("tech_rider"),
+  travelNotes: text("travel_notes"),
+  pickupAt: timestamp("pickup_at"),
+  pickupLocation: text("pickup_location"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const artistCosts = pgTable("artist_costs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  artistId: uuid("artist_id").references(() => artists.id, { onDelete: "cascade" }).notNull(),
+  label: text("label").notNull(),
+  amount: integer("amount").notNull(),        // cents
+  currency: currencyEnum("currency").default("EUR"),
+  paid: boolean("paid").notNull().default(false),
+  notes: text("notes"),
+});
+
+export const artistContacts = pgTable("artist_contacts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  artistId: uuid("artist_id").references(() => artists.id, { onDelete: "cascade" }).notNull(),
+  name: text("name"),
+  role: text("role"),             // manager, agent…
+  email: text("email"),
+  phone: text("phone"),
+  isPrimary: boolean("is_primary").notNull().default(false),
+});
+
+export const bookings = pgTable("bookings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  artistId: uuid("artist_id").references(() => artists.id, { onDelete: "cascade" }).notNull(),
+  stage: stageEnum("stage"),
+  startAt: timestamp("start_at").notNull(),
+  endAt: timestamp("end_at").notNull(),
+  status: bookingStatus("status").notNull().default("draft"),
+  feeAmount: integer("fee_amount"),                 // en cents
+  feeCurrency: currencyEnum("fee_currency").default("EUR"),
+  hospitalityNotes: text("hospitality_notes"),
+  techRider: text("tech_rider"),
+  travelNotes: text("travel_notes"),
+  pickupAt: timestamp("pickup_at"),
+  pickupLocation: text("pickup_location"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const bookingCosts = pgTable("booking_costs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  bookingId: uuid("booking_id").references(() => bookings.id, { onDelete: "cascade" }).notNull(),
+  label: text("label").notNull(),                // cachet, hôtel, transport…
+  amount: integer("amount").notNull(),          // en cents
+  currency: currencyEnum("currency").default("EUR"),
+  paid: boolean("paid").notNull().default(false),
+  notes: text("notes"),
 });

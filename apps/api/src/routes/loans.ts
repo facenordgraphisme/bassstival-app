@@ -214,4 +214,17 @@ router.delete("/:id/items/:itemId", async (req: Request, res: Response) => {
   }
 });
 
+/** Supprimer une fiche (et ses items via FK cascade) */
+router.delete("/:id", async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id ?? "";
+    if (!id) return res.status(400).json({ error: "id manquant" });
+
+    await db.delete(loans).where(eq(loans.id, id));
+    return res.json({ ok: true });
+  } catch (e: any) {
+    return res.status(500).json({ error: e?.message || "Server error" });
+  }
+});
+
 export default router;

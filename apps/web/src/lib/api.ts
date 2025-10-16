@@ -96,6 +96,20 @@ export function deleteItem(loanId: string, itemId: string): Promise<{ ok: true }
   });
 }
 
+export function updateLoan(
+  id: string,
+  patch: Partial<Pick<Loan, "borrowerName" | "note">>
+): Promise<{ ok: true }> {
+  return request<{ ok: true }>(`/loans/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
+}
+
+export function deleteLoan(id: string): Promise<{ ok: true }> {
+  return request<{ ok: true }>(`/loans/${id}`, { method: "DELETE" });
+}
+
 // Pour la recherche: mêmes champs qu’un Loan + matchedItems éventuels
 export function searchLoans(
   q: string,

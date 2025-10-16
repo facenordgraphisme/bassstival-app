@@ -3,21 +3,11 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X, LayoutDashboard, ClipboardList, Users } from "lucide-react";
+import { Menu, X, LayoutDashboard, ClipboardList, Users, Music3, CalendarClock } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import Brand from "@/components/Brand";
 
-function NavLink({
-  href,
-  children,
-  icon,
-  onClick,
-}: {
-  href: string;
-  children: React.ReactNode;
-  icon?: React.ReactNode;
-  onClick?: () => void;
-}) {
+function NavLink({ href, children, icon, onClick }: { href: string; children: React.ReactNode; icon?: React.ReactNode; onClick?: () => void; }) {
   const pathname = usePathname();
   const active = pathname === href || (href !== "/" && pathname?.startsWith(href));
   return (
@@ -37,9 +27,7 @@ export default function Navbar() {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    const onResize = () => {
-      if (window.innerWidth >= 768 && open) setOpen(false);
-    };
+    const onResize = () => { if (window.innerWidth >= 768 && open) setOpen(false); };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, [open]);
@@ -57,9 +45,10 @@ export default function Navbar() {
             <NavLink href="/" icon={<LayoutDashboard size={16} aria-hidden />}>Dashboard</NavLink>
             <NavLink href="/tools" icon={<ClipboardList size={16} aria-hidden />}>Outils</NavLink>
             <NavLink href="/volunteers" icon={<Users size={16} aria-hidden />}>Bénévoles</NavLink>
+            <NavLink href="/lineup" icon={<Music3 size={16} aria-hidden />}>Line Up</NavLink>
           </div>
 
-          {/* Only the theme toggle on the right */}
+          {/* Right side */}
           <div className="hidden md:flex items-center gap-2">
             <ThemeToggle />
           </div>
@@ -82,15 +71,10 @@ export default function Navbar() {
           className={`md:hidden overflow-hidden transition-[max-height,opacity] duration-200 ${open ? "max-h-96 opacity-100" : "max-h-0 opacity-0"}`}
         >
           <div className="pt-3 pb-2 border-t border-white/10 grid gap-2">
-            <NavLink href="/" icon={<LayoutDashboard size={16} />} onClick={() => setOpen(false)}>
-              Dashboard
-            </NavLink>
-            <NavLink href="/tools" icon={<ClipboardList size={16} />} onClick={() => setOpen(false)}>
-              Outils (Prêts)
-            </NavLink>
-            <NavLink href="/volunteers" icon={<Users size={16} />} onClick={() => setOpen(false)}>
-              Bénévoles
-            </NavLink>
+            <NavLink href="/" icon={<LayoutDashboard size={16} />} onClick={() => setOpen(false)}>Dashboard</NavLink>
+            <NavLink href="/tools" icon={<ClipboardList size={16} />} onClick={() => setOpen(false)}>Outils (Prêts)</NavLink>
+            <NavLink href="/volunteers" icon={<Users size={16} />} onClick={() => setOpen(false)}>Bénévoles</NavLink>
+            <NavLink href="/lineup" icon={<Music3 size={16} />} onClick={() => setOpen(false)}>Line Up</NavLink>
 
             <div className="flex items-center justify-between mt-2">
               <span className="text-sm opacity-70">Thème</span>
