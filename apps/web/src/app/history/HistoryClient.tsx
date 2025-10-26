@@ -22,7 +22,7 @@ export default function HistoryClient({
     <>
       {/* EN COURS */}
       <section className="space-y-4">
-        <h1 className="text-3xl font-extrabold title-underline" style={{ fontFamily: "var(--font-title)" }}>
+        <h1 className="lg:text-3xl text-xl font-extrabold title-underline mb-6" style={{ fontFamily: "var(--font-title)" }}>
           En cours
         </h1>
         {open.length === 0 ? (
@@ -32,7 +32,7 @@ export default function HistoryClient({
             {open.map((l) => (
               <a key={l.id} href={`/loans/${l.id}`} className="card neon lift block">
                 <div className="flex items-center justify-between">
-                  <div className="text-lg font-bold">{l.borrowerName}</div>
+                  <div className="lg:text-lg text-sm font-bold">{l.borrowerName}</div>
                   <span className="badge">Ouverte</span>
                 </div>
                 <div className="text-sm" style={{ color: "var(--muted)" }}>
@@ -49,7 +49,7 @@ export default function HistoryClient({
       {/* CLÔTURÉES + SWITCH */}
       <section className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-3xl font-extrabold title-underline" style={{ fontFamily: "var(--font-title)" }}>
+          <h2 className="lg:text-3xl text-xl font-extrabold title-underline mr-4" style={{ fontFamily: "var(--font-title)" }}>
             Clôturées
           </h2>
           <NeonSwitch
@@ -68,7 +68,7 @@ export default function HistoryClient({
             {filteredClosed.map((l) => (
               <a key={l.id} href={`/loans/${l.id}`} className="card neon lift block">
                 <div className="flex items-center justify-between">
-                  <div className="text-lg font-bold">{l.borrowerName}</div>
+                  <div className="lg:text-lg text-sm font-bold">{l.borrowerName}</div>
                   <RemainingBadge remaining={l.remaining} />
                 </div>
                 <div className="text-sm" style={{ color: "var(--muted)" }}>

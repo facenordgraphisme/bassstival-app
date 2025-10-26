@@ -2,8 +2,11 @@ import type { Shift, Team } from "./volunteers";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL!;
 if (!BASE || !/^https?:\/\//i.test(BASE)) {
-  // Evite les crashs obscurs en prod
-  console.error("[lib/api] NEXT_PUBLIC_API_URL invalide:", BASE);
+  if (process.env.NODE_ENV !== "production") {
+    throw new Error("[lib/api] NEXT_PUBLIC_API_URL invalide: " + String(BASE));
+  } else {
+    console.error("[lib/api] NEXT_PUBLIC_API_URL invalide:", BASE);
+  }
 }
 
 // --- Types ---
@@ -76,20 +79,21 @@ export function addItem(
   });
 }
 
+// returnItem : le back renvoie { ok, autoClosed }
 export function returnItem(
   loanId: string,
   itemId: string,
   qtyIn: number
-): Promise<LoanItem> {
-  // adapte le type si ton API renvoie autre chose
-  return request<LoanItem>(`/loans/${loanId}/items/${itemId}/return`, {
+): Promise<{ ok: true; autoClosed: boolean }> {
+  return request<{ ok: true; autoClosed: boolean }>(`/loans/${loanId}/items/${itemId}/return`, {
     method: "PATCH",
     body: JSON.stringify({ qtyIn }),
   });
 }
 
-export function forceClose(id: string): Promise<Loan> {
-  return request<Loan>(`/loans/${id}/close`, { method: "PATCH" });
+// forceClose : le back renvoie { ok: true }
+export function forceClose(id: string): Promise<{ ok: true }> {
+  return request<{ ok: true }>(`/loans/${id}/close`, { method: "PATCH" });
 }
 
 export function deleteItem(loanId: string, itemId: string): Promise<{ ok: true }> {

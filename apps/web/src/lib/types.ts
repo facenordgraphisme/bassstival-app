@@ -1,7 +1,10 @@
+import type { Team } from "./teams"; // <— source unique minuscule
+
 export type ItemStatus = "open" | "returned";
 export type LoanStatus = "open" | "closed";
-export type Team = "Bar" | "Billetterie" | "Parking" | "Bassspatrouille" | "Tech" | "Autre";
 
+// ✅ Team maintenant en minuscules (héritée de teams.ts)
+export { Team };
 export type LoanItem = {
   id: string;
   loanId: string;

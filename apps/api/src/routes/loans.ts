@@ -1,35 +1,66 @@
 import { Router, Request, Response } from "express";
+import { z } from "zod";
 import { db } from "../drizzle/db";
 import { loans, loanItems } from "../drizzle/schema";
-import { and, or, ilike, eq, sql, exists } from "drizzle-orm";
+import { and, ilike, eq, sql, exists, or } from "drizzle-orm";
+import { validateBody, validateQuery } from "../utils/validate";
 
 type LoanStatus = "open" | "closed";
 const router = Router();
 
+const zCreateLoan = z.object({
+  borrowerName: z.string().min(1),
+  note: z.string().optional().nullable(),
+  items: z.array(
+    z.object({
+      itemName: z.string().min(1),
+      qtyOut: z.number().int().positive().optional().default(1),
+      note: z.string().optional().nullable(),
+    })
+  ).optional(),
+});
+
+const zPatchLoan = z.object({
+  borrowerName: z.string().min(1).optional(),
+  note: z.string().optional().nullable(),
+});
+
+const zAddItem = z.object({
+  itemName: z.string().min(1),
+  qtyOut: z.number().int().positive().optional().default(1),
+  note: z.string().optional().nullable(),
+});
+
+const zReturnItem = z.object({
+  qtyIn: z.number().int().nonnegative().default(0),
+});
+
+const zListLoansQuery = z.object({
+  status: z.enum(["open","closed"]).optional(),
+});
+
+const zSearchLoansQuery = z.object({
+  q: z.string().min(1),
+  status: z.enum(["open","closed"]).optional(),
+});
+
 /** Créer une fiche + items optionnels */
-router.post("/", async (req: Request, res: Response) => {
+router.post("/", validateBody(zCreateLoan), async (req: Request, res: Response) => {
   try {
-    const { borrowerName, note, items } = req.body || {};
-    if (!borrowerName || typeof borrowerName !== "string") {
-      return res.status(400).json({ error: "borrowerName requis" });
-    }
+    const { borrowerName, note, items } = req.validated as z.infer<typeof zCreateLoan>;
 
     const created = await db.insert(loans).values({ borrowerName, note }).returning();
     const loan = created[0];
     if (!loan) return res.status(500).json({ error: "Création fiche échouée" });
 
-    // Ajout éventuel d’items
-    if (Array.isArray(items) && items.length > 0) {
-      const rows = items
-        .map((i: any) => ({
-          loanId: loan.id as string,
-          itemName: String(i?.itemName ?? "").trim(),
-          qtyOut: Number(i?.qtyOut) || 1,
-          note: i?.note ?? null,
-        }))
-        .filter((v) => v.itemName.length > 0);
-
-      if (rows.length) await db.insert(loanItems).values(rows);
+    if (items?.length) {
+      const rows = items.map(i => ({
+        loanId: loan.id as string,
+        itemName: i.itemName.trim(),
+        qtyOut: i.qtyOut ?? 1,
+        note: i.note ?? null,
+      }));
+      await db.insert(loanItems).values(rows);
     }
 
     return res.status(201).json({ id: loan.id });
@@ -39,15 +70,11 @@ router.post("/", async (req: Request, res: Response) => {
 });
 
 /** Lister toutes les fiches */
-router.get("/", async (req: Request, res: Response) => {
+router.get("/", validateQuery(zListLoansQuery), async (req: Request, res: Response) => {
   try {
-    const q = req.query.status as LoanStatus | undefined;
-    if (q && q !== "open" && q !== "closed") {
-      return res.status(400).json({ error: "status doit être 'open' ou 'closed'" });
-    }
-
-    const rows = q
-      ? await db.select().from(loans).where(eq(loans.status, q)).orderBy(loans.openedAt)
+    const { status } = req.q as z.infer<typeof zListLoansQuery>;
+    const rows = status
+      ? await db.select().from(loans).where(eq(loans.status, status as LoanStatus)).orderBy(loans.openedAt)
       : await db.select().from(loans).orderBy(loans.openedAt);
 
     return res.json(rows);
@@ -57,18 +84,13 @@ router.get("/", async (req: Request, res: Response) => {
 });
 
 // Recherche par nom d'emprunteur ET/OU nom d'objet
-router.get("/search", async (req: Request, res: Response) => {
+router.get("/search", validateQuery(zSearchLoansQuery), async (req: Request, res: Response) => {
   try {
-    const q = String(req.query.q || "").trim();
-    const status = (req.query.status as "open" | "closed" | undefined) || undefined;
-    if (!q) return res.json([]);
-
+    const { q, status } = req.q as z.infer<typeof zSearchLoansQuery>;
     const pattern = `%${q}%`;
 
-    // 1) d’abord on récupère les loans qui matchent nom ou items
     const itemsExist = exists(
-      db
-        .select({ one: sql`1` })
+      db.select({ one: sql`1` })
         .from(loanItems)
         .where(and(eq(loanItems.loanId, loans.id), ilike(loanItems.itemName, pattern)))
         .limit(1)
@@ -79,21 +101,19 @@ router.get("/search", async (req: Request, res: Response) => {
     const matchedLoans = await db
       .select()
       .from(loans)
-      .where(status ? and(whereBase, eq(loans.status, status)) : whereBase)
+      .where(status ? and(whereBase, eq(loans.status, status as LoanStatus)) : whereBase)
       .orderBy(loans.openedAt);
 
-    // 2) ensuite, on récupère pour chaque loan les items qui matchent
     const allMatches: Array<{ loanId: string; itemName: string }> = await db
       .select({ loanId: loanItems.loanId, itemName: loanItems.itemName })
       .from(loanItems)
       .where(ilike(loanItems.itemName, pattern));
 
-    // 3) On regroupe
     const response = matchedLoans.map((loan) => {
       const matchedItems = allMatches
         .filter((it) => it.loanId === loan.id)
         .map((it) => it.itemName)
-        .slice(0, 3); // max 3 items
+        .slice(0, 3);
       return { ...loan, matchedItems };
     });
 
@@ -102,6 +122,7 @@ router.get("/search", async (req: Request, res: Response) => {
     res.status(500).json({ error: e?.message || "Server error" });
   }
 });
+
 /** Détail fiche (+ items) */
 router.get("/:id", async (req: Request, res: Response) => {
   try {
@@ -120,14 +141,18 @@ router.get("/:id", async (req: Request, res: Response) => {
 });
 
 /** Modifier fiche (nom, note) */
-router.patch("/:id", async (req: Request, res: Response) => {
+router.patch("/:id", validateBody(zPatchLoan), async (req: Request, res: Response) => {
   try {
     const id = req.params.id ?? "";
     if (!id) return res.status(400).json({ error: "id manquant" });
 
-    const { borrowerName, note } = req.body || {};
-    await db.update(loans).set({ borrowerName, note }).where(eq(loans.id, id));
+    const { borrowerName, note } = req.validated as z.infer<typeof zPatchLoan>;
+    const patch: any = {};
+    if (borrowerName !== undefined) patch.borrowerName = borrowerName;
+    if (note !== undefined) patch.note = note ?? null;
 
+    if (!Object.keys(patch).length) return res.json({ ok: true });
+    await db.update(loans).set(patch).where(eq(loans.id, id));
     return res.json({ ok: true });
   } catch (e: any) {
     return res.status(500).json({ error: e?.message || "Server error" });
@@ -148,47 +173,41 @@ router.patch("/:id/close", async (req: Request, res: Response) => {
 });
 
 /** Ajouter un item à une fiche */
-router.post("/:id/items", async (req: Request, res: Response) => {
+router.post("/:id/items", validateBody(zAddItem), async (req: Request, res: Response) => {
   try {
     const id = req.params.id ?? "";
     if (!id) return res.status(400).json({ error: "id manquant" });
 
-    const { itemName, qtyOut, note } = req.body || {};
-    if (!itemName || typeof itemName !== "string") {
-      return res.status(400).json({ error: "itemName requis" });
-    }
-
-    const inserted = await db.insert(loanItems).values({
+    const { itemName, qtyOut, note } = req.validated as z.infer<typeof zAddItem>;
+    const [inserted] = await db.insert(loanItems).values({
       loanId: id,
       itemName,
-      qtyOut: Number(qtyOut) || 1,
+      qtyOut: qtyOut ?? 1,
       note: note ?? null,
     }).returning();
 
-    return res.status(201).json(inserted[0]);
+    return res.status(201).json(inserted);
   } catch (e: any) {
     return res.status(500).json({ error: e?.message || "Server error" });
   }
 });
 
 /** Retour partiel/total d’un item */
-router.patch("/:id/items/:itemId/return", async (req: Request, res: Response) => {
+router.patch("/:id/items/:itemId/return", validateBody(zReturnItem), async (req: Request, res: Response) => {
   try {
     const { id, itemId } = req.params;
     if (!id || !itemId) return res.status(400).json({ error: "id/itemId manquant" });
 
-    const qtyIn = Number(req.body?.qtyIn) || 0;
-
+    const { qtyIn } = req.validated as z.infer<typeof zReturnItem>;
     const itemRows = await db.select().from(loanItems).where(eq(loanItems.id, itemId)).limit(1);
     const item = itemRows[0];
     if (!item || item.loanId !== id) return res.status(404).json({ error: "Ligne introuvable" });
 
-    const newQtyIn = Math.min(item.qtyIn + qtyIn, item.qtyOut);
+    const newQtyIn = Math.min(item.qtyIn + (qtyIn ?? 0), item.qtyOut);
     const newStatus = newQtyIn === item.qtyOut ? "returned" : "open";
 
     await db.update(loanItems).set({ qtyIn: newQtyIn, status: newStatus as any }).where(eq(loanItems.id, itemId));
 
-    // auto-close si tout est rendu
     const remaining = await db.select().from(loanItems).where(eq(loanItems.loanId, id));
     const allReturned = remaining.length > 0 && remaining.every((r) => r.status === "returned");
     if (allReturned) {

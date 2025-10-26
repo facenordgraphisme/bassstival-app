@@ -26,6 +26,9 @@ function NavLink({ href, children, icon, onClick }: { href: string; children: Re
 export default function Navbar() {
   const [open, setOpen] = useState(false);
 
+  const pathname = usePathname();
+  useEffect(() => setOpen(false), [pathname]);
+
   useEffect(() => {
     const onResize = () => { if (window.innerWidth >= 768 && open) setOpen(false); };
     window.addEventListener("resize", onResize);

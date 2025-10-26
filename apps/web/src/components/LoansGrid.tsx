@@ -134,7 +134,7 @@ export default function LoansGrid({
             typeof l.openedAt === "string" && l.openedAt
               ? new Date(l.openedAt)
               : null;
-          return `${opened ? opened.toLocaleDateString() : "—"} • ${
+          return `${opened ? opened.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—"} • ${
             l.status === "open" ? "Ouverte" : "Clôturée"
           }`;
         })()}

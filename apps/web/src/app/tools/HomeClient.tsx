@@ -73,19 +73,19 @@ export default function HomeClient({
         <div className="flex items-center gap-3">
           <BackButton className="!px-2.5 !py-1.5 mt-2 mr-2" />
           <h1
-            className="text-3xl font-extrabold title-underline"
+            className="lg:text-3xl text-xl font-extrabold title-underline"
             style={{ fontFamily: "var(--font-title)" }}
           >
-            Outils – Fiches de prêt
+            Outils – <br/> Fiches de prêt
           </h1>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-5 mt-2">
           {/* Recherche */}
           <div className="input-wrap">
             <input
               className="input input-icon w-64"
-              placeholder="Rechercher… (nom ou objet)"
+              placeholder="Rechercher…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
@@ -106,7 +106,7 @@ export default function HomeClient({
             size="sm"
             checked={onlyOpen}
             onChange={setOnlyOpen}
-            label="Uniquement ouvertes"
+            label="Uniquement en cours"
           />
         </div>
       </div>
@@ -114,7 +114,7 @@ export default function HomeClient({
           <div className="hidden sm:flex items-center gap-2 mr-2">
             <Link className="btn" href="/loans/new">
               <PlusCircle size={16} className="mr-1" aria-hidden />
-              Nouvelle fiche
+              Créer
             </Link>
             <Link className="btn" href="/history">
               <History size={16} className="mr-1" aria-hidden />
@@ -127,7 +127,7 @@ export default function HomeClient({
       <div className="sm:hidden flex gap-2">
         <Link className="btn w-full justify-center" href="/loans/new">
           <PlusCircle size={16} className="mr-2" />
-          Nouvelle fiche
+          Créer
         </Link>
         <Link className="btn w-full justify-center" href="/history">
           <History size={16} className="mr-2" />

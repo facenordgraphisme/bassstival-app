@@ -405,3 +405,38 @@ header {
   font-size: 12px;
   white-space: pre-wrap;
 }
+
+/* === Neon Green helpers (items rendus) === */
+:root {
+  --neon-green: #27ffa8;             /* vert néon principal */
+  --neon-green-soft: color-mix(in srgb, #0b1210 82%, var(--neon-green) 18%);
+  --neon-green-border: color-mix(in srgb, var(--neon-green) 45%, transparent);
+  --neon-green-glow: color-mix(in srgb, var(--neon-green) 50%, transparent);
+}
+
+/* halo + fond doux pour les items returned */
+.neon-green-soft {
+  background: var(--neon-green-soft);
+  border-color: var(--neon-green-border) !important;
+  position: relative;
+}
+.neon-green-soft::after {
+  content: "";
+  position: absolute; inset: 0; pointer-events: none;
+  box-shadow: 0 0 24px 2px var(--neon-green-glow) inset,
+              0 0 20px 2px var(--neon-green-glow);
+  border-radius: inherit; opacity: .55;
+}
+
+/* texte vert néon + petit glow lisible */
+.text-neon-green { color: var(--neon-green); }
+.glow-green { text-shadow: 0 0 6px var(--neon-green-glow); }
+
+/* badge néon pour "Tout rendu" */
+.badge-returned-neon {
+  @apply text-xs px-2 py-1 rounded-full border font-semibold;
+  color: #052a1f;
+  background: color-mix(in srgb, white 10%, var(--neon-green) 90%);
+  border-color: var(--neon-green-border);
+  box-shadow: 0 0 18px 2px var(--neon-green-glow);
+}

@@ -3,7 +3,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
-import { Download, Printer, RefreshCw } from "lucide-react";
+import { Printer, RefreshCw } from "lucide-react";
 import type { Team, Shift, ShiftAssignments } from "@/lib/volunteers";
 import { getShiftAssignments } from "@/lib/volunteers";
 import { listShifts } from "@/lib/api";
@@ -154,16 +154,6 @@ export default function PlanningGridClient() {
   const PX_PER_MIN = 1.2; // ajuste pour compacité
   const totalMinutes = minutesSince(dayStart, dayEnd);
   const gridHeight = Math.max(300, Math.round(totalMinutes * PX_PER_MIN));
-
-  const onExport = () => {
-    const base = process.env.NEXT_PUBLIC_API_URL!;
-    const usp = new URLSearchParams();
-    if (team) usp.set("team", team);
-    usp.set("from", dayStart.toISOString());
-    usp.set("to", dayEnd.toISOString());
-    window.open(`${base}/volunteers/export/csv?${usp.toString()}`, "_blank");
-  };
-
   const onPrint = () => window.print();
 
   return (
@@ -220,9 +210,6 @@ export default function PlanningGridClient() {
         <div className="flex gap-2">
           <button className="btn-ghost" onClick={() => mutate()}>
             <RefreshCw size={16} className="mr-2" /> Rafraîchir
-          </button>
-          <button className="btn" onClick={onExport}>
-            <Download size={16} className="mr-2" /> Export CSV
           </button>
           <button className="btn" onClick={onPrint}>
             <Printer size={16} className="mr-2" /> Imprimer

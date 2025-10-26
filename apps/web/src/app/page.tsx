@@ -17,8 +17,8 @@ function Tile({ href, title, desc, icon }: { href: string; title: string; desc: 
 export default function Page() {
   return (
     <FadeUp className="space-y-8">
-      <h1 className="text-3xl font-extrabold title-underline" style={{ fontFamily: "var(--font-title)" }}>
-        Bassstival • Tableau de bord
+      <h1 className="lg:text-3xl text-xl font-extrabold title-underline" style={{ fontFamily: "var(--font-title)" }}>
+        Bassstival • <br/> Tableau de bord
       </h1>
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">

@@ -54,7 +54,7 @@ export default function NewLoan() {
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
             >
-              <input className="input" placeholder="Objet (ex: Disqueuse)" value={r.itemName} onChange={(e) => setRow(i, { itemName: e.target.value })} />
+              <input className="input" placeholder="Objet" value={r.itemName} onChange={(e) => setRow(i, { itemName: e.target.value })} />
               <input className="input w-28" type="number" min={1} value={r.qtyOut} onChange={(e) => setRow(i, { qtyOut: Number(e.target.value) })} />
             </motion.div>
           ))}
@@ -62,7 +62,7 @@ export default function NewLoan() {
         </div>
         <div className="flex justify-end">
           <button className="btn" onClick={submit} disabled={loading}>
-            {loading ? "Création…" : "Créer la fiche"}
+            {loading ? "Création…" : "Créer"}
           </button>
         </div>
       </div>

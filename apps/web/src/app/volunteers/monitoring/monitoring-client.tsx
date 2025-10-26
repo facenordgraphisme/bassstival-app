@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { listMonitoring, type MonitoringRow, type Team } from "@/lib/volunteers";
 import Link from "next/link";
 
-const TEAMS: Team[] = ["bar", "billetterie", "parking", "bassspatrouille", "tech", "autre"];
+import { TEAM_KEYS } from "@/lib/teams";
 
 function dayKey(iso: string) {
   const d = new Date(iso);
@@ -55,7 +55,7 @@ export default function MonitoringClient({ initial }: { initial: MonitoringRow[]
             <label className="text-xs opacity-70 mb-1">Équipe</label>
             <select className="input" value={team} onChange={e => setTeam(e.target.value as Team | "")}>
               <option value="">Toutes</option>
-              {TEAMS.map(t => <option key={t} value={t}>{t}</option>)}
+              {TEAM_KEYS.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
           <div className="flex flex-col">

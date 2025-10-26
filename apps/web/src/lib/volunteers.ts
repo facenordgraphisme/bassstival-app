@@ -56,14 +56,11 @@ export type ShiftAssignmentRow = {
 };
 
 export type ShiftAssignments = {
-  shift: Shift;
-  shiftId: string;
-  assignments: AssignmentRow[];
-  used: number;
   capacity: number;
+  used: number;
   remaining: number;
+  assignments: ShiftAssignmentRow[];
 };
-
 export type MonitoringRow = {
   id: string;
   team: Team;

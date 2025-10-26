@@ -1,11 +1,87 @@
 import { Router } from "express";
+import { z } from "zod";
 import { db } from "../drizzle/db";
 import {
-  artists, artistContacts, bookings, bookingCosts,artistCosts 
+  artists, artistContacts, bookings, bookingCosts, artistCosts
 } from "../drizzle/schema";
-import { and, eq, ilike, gte, lte, asc, desc, not, or, lt, gt } from "drizzle-orm";
+import { and, eq, ilike, gte, lte, asc, not, or, lt, gt } from "drizzle-orm";
+import { validateBody, validateQuery } from "../utils/validate";
 
 const router = Router();
+
+const ArtistStatus = z.enum(["prospect","pending","confirmed","canceled"]);
+const BookingStatus = z.enum(["draft","confirmed","played","canceled"]);
+const StageEnum     = z.enum(["main","second","vip"]).nullable().optional();
+
+const zCreateArtist = z.object({
+  name: z.string().min(1),
+  genre: z.string().trim().optional().nullable(),
+  agency: z.string().trim().optional().nullable(),
+  status: ArtistStatus.optional(),
+  notes: z.string().optional().nullable(),
+  feeAmount: z.number().int().nonnegative().optional().nullable(),
+  feeCurrency: z.literal("EUR").optional(),
+  hospitalityNotes: z.string().optional().nullable(),
+  techRider: z.string().optional().nullable(),
+  travelNotes: z.string().optional().nullable(),
+  pickupAt: z.coerce.date().optional().nullable(),
+  pickupLocation: z.string().optional().nullable(),
+});
+
+const zPatchArtist = zCreateArtist.partial();
+
+const zListArtistsQuery = z.object({
+  q: z.string().optional(),
+  status: ArtistStatus.optional(),
+});
+
+const zCreateCost = z.object({
+  label: z.string().min(1),
+  amount: z.number().int().nonnegative(),
+  currency: z.literal("EUR").optional(),
+  paid: z.coerce.boolean().optional(),
+  notes: z.string().optional().nullable(),
+});
+
+const zPatchCost = zCreateCost.partial();
+
+const zCreateContact = z.object({
+  name: z.string().optional().nullable(),
+  role: z.string().optional().nullable(),
+  email: z.string().email().optional().nullable(),
+  phone: z.string().optional().nullable(),
+  isPrimary: z.coerce.boolean().optional(),
+});
+
+const zPatchContact = zCreateContact.partial();
+
+const zListBookingsQuery = z.object({
+  artistId: z.string().uuid().optional(),
+  stage: z.enum(["main","second","vip"]).optional(),
+  status: BookingStatus.optional(),
+  from: z.coerce.date().optional(),
+  to: z.coerce.date().optional(),
+}).refine(q => !q.from || !q.to || q.from <= q.to, { message: "from must be <= to" });
+
+const zCreateBooking = z.object({
+  artistId: z.string().uuid(),
+  stage: StageEnum,
+  startAt: z.coerce.date(),
+  endAt: z.coerce.date(),
+  status: BookingStatus.optional(),
+  feeAmount: z.number().int().nonnegative().optional().nullable(),
+  feeCurrency: z.literal("EUR").optional(),
+  hospitalityNotes: z.string().optional().nullable(),
+  techRider: z.string().optional().nullable(),
+  travelNotes: z.string().optional().nullable(),
+  pickupAt: z.coerce.date().optional().nullable(),
+  pickupLocation: z.string().optional().nullable(),
+}).refine(b => b.endAt > b.startAt, { message: "endAt must be after startAt" });
+
+const zPatchBooking = zCreateBooking.partial().refine(b => {
+  if (b.startAt && b.endAt) return b.endAt > b.startAt;
+  return true;
+}, { message: "endAt must be after startAt" });
 
 // -------- Helpers --------
 function parseDate(v: unknown): Date | null {
@@ -16,10 +92,9 @@ function parseDate(v: unknown): Date | null {
 }
 
 // -------- Artists --------
-router.get("/artists", async (req, res) => {
+router.get("/artists", validateQuery(zListArtistsQuery), async (req, res) => {
   try {
-    const q = String(req.query.q || "").trim();
-    const status = req.query.status as undefined | "prospect" | "pending" | "confirmed" | "canceled";
+    const { q = "", status } = req.q as z.infer<typeof zListArtistsQuery>;
 
     const parts = [];
     if (q) {
@@ -38,34 +113,31 @@ router.get("/artists", async (req, res) => {
   } catch (e:any) { res.status(500).json({ error: e?.message || "Server error" }); }
 });
 
-router.post("/artists", async (req, res) => {
+router.post("/artists", validateBody(zCreateArtist), async (req, res) => {
   try {
-    const b = req.body || {};
-    if (!b.name) return res.status(400).json({ error: "name requis" });
+    const b = req.validated as z.infer<typeof zCreateArtist>;
     const [row] = await db.insert(artists).values({
       name: b.name,
       genre: b.genre ?? null,
       agency: b.agency ?? null,
       status: b.status ?? "prospect",
       notes: b.notes ?? null,
-
-      feeAmount: typeof b.feeAmount === "number" ? b.feeAmount : null,
+      feeAmount: b.feeAmount ?? null,
       feeCurrency: b.feeCurrency ?? "EUR",
       hospitalityNotes: b.hospitalityNotes ?? null,
       techRider: b.techRider ?? null,
       travelNotes: b.travelNotes ?? null,
-      pickupAt: b.pickupAt ? parseDate(b.pickupAt) : null,
+      pickupAt: b.pickupAt ?? null,
       pickupLocation: b.pickupLocation ?? null,
     }).returning();
     res.status(201).json(row);
   } catch (e:any) { res.status(500).json({ error: e?.message || "Server error" }); }
 });
 
-// PATCH /artists/:id  (ajouter mapping des nouveaux champs)
-router.patch("/artists/:id", async (req, res) => {
+router.patch("/artists/:id", validateBody(zPatchArtist), async (req, res) => {
   try {
     const id = req.params.id;
-    const b = req.body || {};
+    const b = req.validated as z.infer<typeof zPatchArtist>;
     const patch:any = {};
     if ("name" in b) patch.name = b.name;
     if ("genre" in b) patch.genre = b.genre ?? null;
@@ -73,12 +145,12 @@ router.patch("/artists/:id", async (req, res) => {
     if ("status" in b) patch.status = b.status;
     if ("notes" in b) patch.notes = b.notes ?? null;
 
-    if ("feeAmount" in b) patch.feeAmount = typeof b.feeAmount === "number" ? b.feeAmount : null;
+    if ("feeAmount" in b) patch.feeAmount = b.feeAmount ?? null;
     if ("feeCurrency" in b) patch.feeCurrency = b.feeCurrency ?? "EUR";
     if ("hospitalityNotes" in b) patch.hospitalityNotes = b.hospitalityNotes ?? null;
     if ("techRider" in b) patch.techRider = b.techRider ?? null;
     if ("travelNotes" in b) patch.travelNotes = b.travelNotes ?? null;
-    if ("pickupAt" in b) patch.pickupAt = b.pickupAt ? parseDate(b.pickupAt) : null;
+    if ("pickupAt" in b) patch.pickupAt = b.pickupAt ?? null;
     if ("pickupLocation" in b) patch.pickupLocation = b.pickupLocation ?? null;
 
     if (!Object.keys(patch).length) return res.json({ ok: true });
@@ -87,7 +159,7 @@ router.patch("/artists/:id", async (req, res) => {
   } catch (e:any) { res.status(500).json({ error: e?.message || "Server error" }); }
 });
 
-// ---- Coûts ARTISTE (nouveaux endpoints) ----
+// ---- Coûts ARTISTE ----
 router.get("/artists/:id/costs", async (req, res) => {
   try {
     const rows = await db.select().from(artistCosts).where(eq(artistCosts.artistId, req.params.id));
@@ -98,47 +170,24 @@ router.get("/artists/:id/costs", async (req, res) => {
 router.get("/artists/:id", async (req, res) => {
   try {
     const id = req.params.id;
-
-    // 1) Récup artiste
     const [row] = await db.select().from(artists).where(eq(artists.id, id)).limit(1);
     if (!row) return res.status(404).json({ error: "Artist not found" });
 
-    // 2) Contacts liés (principal d'abord)
-    const contacts = await db
-      .select()
-      .from(artistContacts)
-      .where(eq(artistContacts.artistId, id));
-
-    // (optionnel) si tu veux trier : principal en premier
-    // import { desc, asc } au besoin
-    // .orderBy(desc(artistContacts.isPrimary), asc(artistContacts.name))
-
-    // 3) Retourne le shape attendu par le front (ArtistWithContacts)
+    const contacts = await db.select().from(artistContacts).where(eq(artistContacts.artistId, id));
     res.json({ ...row, contacts });
-  } catch (e:any) {
-    res.status(500).json({ error: e?.message || "Server error" });
-  }
+  } catch (e:any) { res.status(500).json({ error: e?.message || "Server error" }); }
 });
 
 router.delete("/artists/:id", async (req, res) => {
   try {
-    const id = req.params.id;
-    // Optionnel: vérifier l’existence
-    // const [row] = await db.select().from(artists).where(eq(artists.id, id)).limit(1);
-    // if (!row) return res.status(404).json({ error: "Artist not found" });
-
-    await db.delete(artists).where(eq(artists.id, id));
-    // Grâce aux FK `onDelete: "cascade"`, les contacts, costs,
-    // bookings et booking_costs rattachés seront supprimés aussi.
+    await db.delete(artists).where(eq(artists.id, req.params.id));
     res.json({ ok: true });
-  } catch (e: any) {
-    res.status(500).json({ error: e?.message || "Server error" });
-  }
+  } catch (e: any) { res.status(500).json({ error: e?.message || "Server error" }); }
 });
 
-router.post("/artists/:id/costs", async (req, res) => {
+router.post("/artists/:id/costs", validateBody(zCreateCost), async (req, res) => {
   try {
-    const b = req.body || {};
+    const b = req.validated as z.infer<typeof zCreateCost>;
     const [row] = await db.insert(artistCosts).values({
       artistId: req.params.id,
       label: b.label,
@@ -151,9 +200,9 @@ router.post("/artists/:id/costs", async (req, res) => {
   } catch (e:any) { res.status(500).json({ error: e?.message || "Server error" }); }
 });
 
-router.patch("/artist-costs/:costId", async (req, res) => {
+router.patch("/artist-costs/:costId", validateBody(zPatchCost), async (req, res) => {
   try {
-    const b = req.body || {};
+    const b = req.validated as z.infer<typeof zPatchCost>;
     const patch:any = {};
     if ("label" in b) patch.label = b.label;
     if ("amount" in b) patch.amount = b.amount;
@@ -173,10 +222,10 @@ router.delete("/artist-costs/:costId", async (req, res) => {
 });
 
 // Contacts
-router.post("/artists/:id/contacts", async (req, res) => {
+router.post("/artists/:id/contacts", validateBody(zCreateContact), async (req, res) => {
   try {
     const id = req.params.id;
-    const b = req.body || {};
+    const b = req.validated as z.infer<typeof zCreateContact>;
     const [row] = await db.insert(artistContacts).values({
       artistId: id,
       name: b.name ?? null,
@@ -189,10 +238,10 @@ router.post("/artists/:id/contacts", async (req, res) => {
   } catch (e:any) { res.status(500).json({ error: e?.message || "Server error" }); }
 });
 
-router.patch("/contacts/:contactId", async (req, res) => {
+router.patch("/contacts/:contactId", validateBody(zPatchContact), async (req, res) => {
   try {
     const id = req.params.contactId;
-    const b = req.body || {};
+    const b = req.validated as z.infer<typeof zPatchContact>;
     const patch:any = {};
     if ("name" in b) patch.name = b.name ?? null;
     if ("role" in b) patch.role = b.role ?? null;
@@ -212,13 +261,9 @@ router.delete("/contacts/:contactId", async (req, res) => {
 });
 
 // -------- Bookings --------
-router.get("/bookings", async (req, res) => {
+router.get("/bookings", validateQuery(zListBookingsQuery), async (req, res) => {
   try {
-    const artistId = req.query.artistId as string | undefined;
-    const stage = req.query.stage as ("main"|"second"|"vip") | undefined;
-    const status = req.query.status as ("draft"|"confirmed"|"played"|"canceled") | undefined;
-    const from = parseDate(req.query.from);
-    const to   = parseDate(req.query.to);
+    const { artistId, stage, status, from, to } = req.q as z.infer<typeof zListBookingsQuery>;
 
     const parts: any[] = [];
     if (artistId) parts.push(eq(bookings.artistId, artistId));
@@ -226,9 +271,8 @@ router.get("/bookings", async (req, res) => {
     if (status)   parts.push(eq(bookings.status, status));
 
     if (from && to) {
-      // Overlap correct : NOT (end < from OR start > to)
-      const endBeforeFrom  = lt(bookings.endAt, from!);
-      const startAfterTo   = gt(bookings.startAt, to!);
+      const endBeforeFrom  = lt(bookings.endAt, from);
+      const startAfterTo   = gt(bookings.startAt, to);
       parts.push(not(or(endBeforeFrom, startAfterTo)!));
     } else if (from) {
       parts.push(gte(bookings.endAt, from));
@@ -243,30 +287,23 @@ router.get("/bookings", async (req, res) => {
       .orderBy(asc(bookings.startAt));
 
     res.json(rows);
-  } catch (e:any) {
-    res.status(500).json({ error: e?.message || "Server error" });
-  }
+  } catch (e:any) { res.status(500).json({ error: e?.message || "Server error" }); }
 });
 
-router.post("/bookings", async (req, res) => {
+router.post("/bookings", validateBody(zCreateBooking), async (req, res) => {
   try {
-    const b = req.body || {};
-    const sa = parseDate(b.startAt);
-    const ea = parseDate(b.endAt);
-    if (!b.artistId) return res.status(400).json({ error: "artistId requis" });
-    if (!sa || !ea || ea <= sa) return res.status(400).json({ error: "startAt/endAt invalides" });
-
+    const b = req.validated as z.infer<typeof zCreateBooking>;
     const [row] = await db.insert(bookings).values({
       artistId: b.artistId,
       stage: b.stage ?? null,
-      startAt: sa, endAt: ea,
+      startAt: b.startAt, endAt: b.endAt,
       status: b.status ?? "draft",
-      feeAmount: typeof b.feeAmount === "number" ? b.feeAmount : null,
+      feeAmount: b.feeAmount ?? null,
       feeCurrency: b.feeCurrency ?? "EUR",
       hospitalityNotes: b.hospitalityNotes ?? null,
       techRider: b.techRider ?? null,
       travelNotes: b.travelNotes ?? null,
-      pickupAt: b.pickupAt ? parseDate(b.pickupAt) : null,
+      pickupAt: b.pickupAt ?? null,
       pickupLocation: b.pickupLocation ?? null,
     }).returning();
     res.status(201).json(row);
@@ -283,23 +320,23 @@ router.get("/bookings/:id", async (req, res) => {
   } catch (e:any) { res.status(500).json({ error: e?.message || "Server error" }); }
 });
 
-router.patch("/bookings/:id", async (req, res) => {
+router.patch("/bookings/:id", validateBody(zPatchBooking), async (req, res) => {
   try {
     const id = req.params.id;
-    const b = req.body || {};
+    const b = req.validated as z.infer<typeof zPatchBooking>;
     const patch:any = {};
     if ("artistId" in b) patch.artistId = b.artistId;
     if ("stage" in b) patch.stage = b.stage ?? null;
     if ("status" in b) patch.status = b.status;
-    if ("feeAmount" in b) patch.feeAmount = typeof b.feeAmount === "number" ? b.feeAmount : null;
+    if ("feeAmount" in b) patch.feeAmount = b.feeAmount ?? null;
     if ("feeCurrency" in b) patch.feeCurrency = b.feeCurrency ?? "EUR";
     if ("hospitalityNotes" in b) patch.hospitalityNotes = b.hospitalityNotes ?? null;
     if ("techRider" in b) patch.techRider = b.techRider ?? null;
     if ("travelNotes" in b) patch.travelNotes = b.travelNotes ?? null;
-    if ("pickupAt" in b) patch.pickupAt = b.pickupAt ? parseDate(b.pickupAt) : null;
+    if ("pickupAt" in b) patch.pickupAt = b.pickupAt ?? null;
     if ("pickupLocation" in b) patch.pickupLocation = b.pickupLocation ?? null;
-    if ("startAt" in b) { const d = parseDate(b.startAt); if (!d) return res.status(400).json({ error: "startAt invalide" }); patch.startAt = d; }
-    if ("endAt" in b)   { const d = parseDate(b.endAt);   if (!d) return res.status(400).json({ error: "endAt invalide" });   patch.endAt = d; }
+    if ("startAt" in b) patch.startAt = b.startAt;
+    if ("endAt" in b)   patch.endAt   = b.endAt;
 
     await db.update(bookings).set(patch).where(eq(bookings.id, id));
     res.json({ ok: true });
@@ -313,7 +350,6 @@ router.delete("/bookings/:id", async (req, res) => {
   } catch (e:any) { res.status(500).json({ error: e?.message || "Server error" }); }
 });
 
-// Costs
 router.get("/bookings/:id/costs", async (req, res) => {
   try {
     const rows = await db.select().from(bookingCosts).where(eq(bookingCosts.bookingId, req.params.id));
@@ -321,9 +357,9 @@ router.get("/bookings/:id/costs", async (req, res) => {
   } catch (e:any) { res.status(500).json({ error: e?.message || "Server error" }); }
 });
 
-router.post("/bookings/:id/costs", async (req, res) => {
+router.post("/bookings/:id/costs", validateBody(zCreateCost), async (req, res) => {
   try {
-    const b = req.body || {};
+    const b = req.validated as z.infer<typeof zCreateCost>;
     const [row] = await db.insert(bookingCosts).values({
       bookingId: req.params.id,
       label: b.label,
@@ -336,9 +372,9 @@ router.post("/bookings/:id/costs", async (req, res) => {
   } catch (e:any) { res.status(500).json({ error: e?.message || "Server error" }); }
 });
 
-router.patch("/costs/:costId", async (req, res) => {
+router.patch("/costs/:costId", validateBody(zPatchCost), async (req, res) => {
   try {
-    const b = req.body || {};
+    const b = req.validated as z.infer<typeof zPatchCost>;
     const patch:any = {};
     if ("label" in b) patch.label = b.label;
     if ("amount" in b) patch.amount = b.amount;
@@ -356,7 +392,5 @@ router.delete("/costs/:costId", async (req, res) => {
     res.json({ ok: true });
   } catch (e:any) { res.status(500).json({ error: e?.message || "Server error" }); }
 });
-
-
 
 export default router;
