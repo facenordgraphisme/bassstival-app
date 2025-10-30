@@ -13,6 +13,7 @@ import {
   Music3,
   Shield,
   ChevronDown,
+  User,
 } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import Brand from "@/components/Brand";
@@ -97,6 +98,11 @@ const [greetKey, setGreetKey] = useState(0);
           {canRoot && (
             <NavLink href="/" icon={<LayoutDashboard size={16} />}>
               Dashboard
+            </NavLink>
+          )}
+          {canRoot && (
+            <NavLink href="/profile" icon={<User size={16} />}>
+              Profil
             </NavLink>
           )}
 

@@ -235,4 +235,22 @@ router.delete(
   }
 );
 
+export function findUserById(id: string) {
+  return users.find((u) => u.id === id);
+}
+
+export async function updateUserDisplayName(id: string, name: string) {
+  const u = findUserById(id);
+  if (!u) throw new Error("User not found");
+  u.name = name;
+  return { id: u.id, email: u.email, name: u.name, roles: u.roles };
+}
+
+export async function changeUserPasswordInStore(id: string, newPassword: string) {
+  const u = findUserById(id);
+  if (!u) throw new Error("User not found");
+  u.passwordHash = await bcrypt.hash(newPassword, 10);
+  return true;
+}
+
 export default router;
