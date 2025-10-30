@@ -1,15 +1,19 @@
 import { auth } from "@/auth";
 import type { Session } from "next-auth";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL!; // e.g. https://your-koyeb-api
+const API_BASE = process.env.NEXT_PUBLIC_API_URL!; // https://<koyeb-api>
 
 function passthroughHeaders(req: Request, token?: string) {
   const out = new Headers();
-  const ct = req.headers.get("content-type");
-  if (ct) out.set("content-type", ct);
+
+  // On force l'upstream à répondre en clair (pas de gzip/br)
+  out.set("accept-encoding", "identity");
   out.set("accept", "application/json");
 
-  // forward browser cookies (helps auth libs that read cookies)
+  const ct = req.headers.get("content-type");
+  if (ct) out.set("content-type", ct);
+
+  // forward cookies du navigateur (utile si l’upstream en a besoin)
   const cookie = req.headers.get("cookie");
   if (cookie) out.set("cookie", cookie);
 
@@ -17,11 +21,11 @@ function passthroughHeaders(req: Request, token?: string) {
   return out;
 }
 
-// Type utilitaire pour lire proprement des champs non-standards ajoutés à la session
+// lecture du token de façon typée
 type MaybeTokens = {
   apiToken?: string | null;
   user?: { apiToken?: string | null } | null;
-  accessToken?: string | null; // au cas où tu l’ajoutes dans tes callbacks
+  accessToken?: string | null;
 } & Partial<Session>;
 
 function extractApiToken(session: Session | null): string | undefined {
@@ -51,12 +55,21 @@ async function forward(method: string, req: Request, path: string[]) {
     method,
     headers,
     body,
+    // important: on laisse le runtime gérer, pas de compression auto
     redirect: "manual",
   });
 
+  // Nettoyage des en-têtes de l’upstream pour éviter les erreurs de décodage
   const respHeaders = new Headers(upstream.headers);
-  // ne propage pas d'éventuels cookies de l'upstream
-  respHeaders.delete("set-cookie");
+  respHeaders.delete("set-cookie");          // ne pas propager
+  respHeaders.delete("content-encoding");    // ⚠️ clé pour ERR_CONTENT_DECODING_FAILED
+  respHeaders.delete("content-length");      // recalculé par runtime
+  respHeaders.delete("transfer-encoding");   // idem
+
+  // si pas de content-type, on en force un
+  if (!respHeaders.has("content-type")) {
+    respHeaders.set("content-type", "application/json; charset=utf-8");
+  }
 
   return new Response(upstream.body, {
     status: upstream.status,
