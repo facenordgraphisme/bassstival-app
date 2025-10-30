@@ -1,14 +1,33 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { Suspense, useState, useTransition } from "react";
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 
 export default function LoginPage() {
-  const params = useSearchParams();
+  // ⬇️ La page elle-même ne lit pas les params; elle rend une boundary
+  return (
+    <Suspense fallback={
+      <div className="max-w-sm mx-auto mt-16 card neon p-6">
+        <div className="h-6 w-32 bg-white/10 rounded mb-4" />
+        <div className="space-y-3">
+          <div className="h-10 bg-white/10 rounded" />
+          <div className="h-10 bg-white/10 rounded" />
+          <div className="h-10 bg-white/10 rounded" />
+        </div>
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
+  const params = useSearchParams(); // ✅ OK, on est sous Suspense
   const callbackUrl = params.get("callbackUrl") || "/";
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [pending, startTransition] = useTransition();
