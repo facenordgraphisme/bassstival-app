@@ -51,20 +51,22 @@ async function forward(method: string, req: Request, path: string[]) {
   const body = hasBody ? await req.arrayBuffer() : undefined;
 
   const upstream = await fetch(url, {
-    method,
-    headers,
-    body,
-    redirect: "manual",
-  });
+  method,
+  headers,
+  body,
+  redirect: "manual",
+});
 
-  const respHeaders = new Headers(upstream.headers);
-  respHeaders.delete("set-cookie");
+const respHeaders = new Headers(upstream.headers);
+respHeaders.delete("set-cookie");
+respHeaders.delete("content-encoding"); // 👈 empêche double décompression
+respHeaders.delete("transfer-encoding");
 
-  return new Response(upstream.body, {
-    status: upstream.status,
-    statusText: upstream.statusText,
-    headers: respHeaders,
-  });
+return new Response(upstream.body, {
+  status: upstream.status,
+  statusText: upstream.statusText,
+  headers: respHeaders,
+});
 }
 
 // Next 15: params est un Promise
