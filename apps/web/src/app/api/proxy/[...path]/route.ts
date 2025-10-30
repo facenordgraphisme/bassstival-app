@@ -1,6 +1,28 @@
 import { auth } from "@/auth";
+import type { Session } from "next-auth";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL!; // http://localhost:8080
+const API_BASE = process.env.NEXT_PUBLIC_API_URL!; // ex: http://localhost:8080
+
+// --- Types propres (pas de any)
+type SessionWithTokens = Session & {
+  apiToken?: string | null;
+  accessToken?: string | null;
+  user?: Session["user"] & {
+    apiToken?: string | null;
+    accessToken?: string | null;
+  };
+};
+
+function getApiToken(session: Session | null): string | undefined {
+  const s = session as SessionWithTokens | null;
+  return (
+    s?.apiToken ??
+    s?.user?.apiToken ??
+    s?.accessToken ??
+    s?.user?.accessToken ??
+    undefined
+  );
+}
 
 function passthroughHeaders(req: Request, token?: string) {
   const out = new Headers();
@@ -13,16 +35,9 @@ function passthroughHeaders(req: Request, token?: string) {
 
 async function forward(method: string, req: Request, path: string[]) {
   const session = await auth();
-
-  // ✅ récupère le token quel que soit l’endroit où tu l’as mis
-  const token =
-    (session as any)?.apiToken ||
-    (session as any)?.user?.apiToken ||
-    (session as any)?.accessToken || // au cas où
-    undefined;
+  const token = getApiToken(session);
 
   if (!token) {
-    // Réponds clairement 401 JSON (pas de HTML ici)
     return new Response(JSON.stringify({ error: "Missing bearer token" }), {
       status: 401,
       headers: { "content-type": "application/json" },

@@ -1,11 +1,4 @@
-// src/lib/artists.ts
-
-/* ===============================
-   Env & base URL
-   =============================== */
 const isServer = typeof window === "undefined";
-
-// Always hit our Next proxy; relative works in both client and SSR
 const PROXY_BASE = "/api/proxy";
 
 /* ===============================
@@ -18,18 +11,25 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   // Base headers
   const headers: HeadersInit = {
     "Content-Type": "application/json",
-    ...(init?.headers || {}),
+    ...(init?.headers ?? {}),
   };
 
-  // ✅ On the server, forward cookies to the proxy (dynamic import, no static "next/headers")
+  // ✅ On the server: forward cookies to proxy
   if (isServer) {
     try {
-      const mod: any = await import("next/headers");
-      const ck = mod?.cookies?.();
-      const cookieStr = ck?.toString?.() || "";
-      if (cookieStr) (headers as any).cookie = cookieStr;
+      // Typage propre du dynamic import
+      const mod = (await import("next/headers")) as {
+        cookies: () => { toString(): string };
+      };
+
+      const ck = mod.cookies();
+      const cookieStr = ck?.toString?.() ?? "";
+      if (cookieStr) {
+        // On ajoute le header cookie proprement
+        (headers as Record<string, string>).cookie = cookieStr;
+      }
     } catch {
-      // noop: if cookies can't be read, the proxy will reject and you'll see it in logs
+      // noop — en cas d’erreur d’import, le proxy rejettera
     }
   }
 
@@ -41,14 +41,22 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!r.ok) {
     let body = "";
-    try { body = await r.text(); } catch {}
-    console.error("[artists.ts] request failed:", r.status, url, body.slice(0, 200));
+    try {
+      body = await r.text();
+    } catch {
+      // ignore
+    }
+    console.error(
+      "[artists.ts] request failed:",
+      r.status,
+      url,
+      body.slice(0, 200)
+    );
     throw new Error(`Request failed: ${r.status} ${r.statusText} @ ${url}`);
   }
 
-  return r.json() as Promise<T>;
+  return (await r.json()) as T;
 }
-
 /* ===============================
    Types
    =============================== */

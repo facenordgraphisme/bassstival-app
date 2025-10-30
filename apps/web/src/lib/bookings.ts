@@ -1,4 +1,3 @@
-// src/lib/bookings.ts
 import type { Stage } from "./artists";
 
 /* ===============================
@@ -16,17 +15,22 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   const headers: HeadersInit = {
     "Content-Type": "application/json",
-    ...(init?.headers || {}),
+    ...(init?.headers ?? {}),
   };
 
-  // ✅ Forward cookies only on the server via dynamic import
+  // ✅ Forward cookies only on the server via dynamic import — typé sans any
   if (isServer) {
     try {
-      const mod: any = await import("next/headers");
-      const ck = mod?.cookies?.();
-      const cookieStr = ck?.toString?.() || "";
-      if (cookieStr) (headers as any).cookie = cookieStr;
-    } catch {}
+      const mod = (await import("next/headers")) as {
+        cookies: () => { toString(): string };
+      };
+      const cookieStr = mod.cookies()?.toString?.() ?? "";
+      if (cookieStr) {
+        (headers as Record<string, string>).cookie = cookieStr;
+      }
+    } catch {
+      // noop: si la lecture des cookies échoue, le proxy renverra 401 et ça loguera côté client
+    }
   }
 
   const r = await fetch(url, {
@@ -41,7 +45,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     console.error("[bookings.ts] request failed:", r.status, url, body.slice(0, 200));
     throw new Error(`Request failed: ${r.status} ${r.statusText} @ ${url}`);
   }
-  return r.json() as Promise<T>;
+
+  return (await r.json()) as T;
 }
 
 /* ===============================
