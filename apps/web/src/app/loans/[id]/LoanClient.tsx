@@ -16,7 +16,7 @@ import { useState } from "react";
 import { Trash2 } from "lucide-react";
 
 type LoanWithItems = Loan & { items: LoanItem[] };
-type Props = { id: string; initial: LoanWithItems };
+type Props = { id: string; initial?: LoanWithItems };
 
 const fetcher = (id: string) => getLoan(id);
 

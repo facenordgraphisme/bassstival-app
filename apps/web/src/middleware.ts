@@ -1,46 +1,51 @@
 // src/middleware.ts
 import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@/auth";
+import type { Session } from "next-auth";
 import { hasAnyRole, SECTION_PERMS } from "@/lib/auth-roles";
 
-export default auth((req: NextRequest & { auth?: any }) => {
-  const { pathname } = req.nextUrl;
+type AuthenticatedRequest = NextRequest & { auth?: Session | null };
 
-  // Public
-  if (pathname.startsWith("/api/auth") || pathname === "/login") {
+export default auth((req: AuthenticatedRequest) => {
+  const { pathname, search } = req.nextUrl;
+
+  // ✅ Routes publiques à laisser passer (pas d'auth middleware ici)
+  if (
+    pathname.startsWith("/api/auth") ||     // NextAuth
+    pathname.startsWith("/api/proxy") ||    // ⬅️ IMPORTANT: le proxy gère déjà l'auth côté serveur
+    pathname === "/login"
+  ) {
     return NextResponse.next();
   }
-  // Assets / fichiers avec extension
-  if (/\.[\w]+$/.test(pathname) || pathname.startsWith("/_next")) {
+
+  // Fichiers statiques ou internes
+  if (/\.[\w]+$/.test(pathname) || pathname.startsWith("/_next") || pathname.startsWith("/static")) {
     return NextResponse.next();
   }
 
   const session = req.auth;
 
-  // Non connecté → login
+  // Non connecté → redirection vers /login (on garde la query)
   if (!session?.user) {
     const url = new URL("/login", req.url);
-    url.searchParams.set("callbackUrl", pathname);
+    url.searchParams.set("callbackUrl", pathname + (search || ""));
     return NextResponse.redirect(url);
   }
 
   const roles: string[] = session.user.roles ?? [];
 
-  // Règles d’accès
   const allow =
     (pathname === "/" && hasAnyRole(roles, SECTION_PERMS.root)) ||
     (pathname.startsWith("/tools") && hasAnyRole(roles, SECTION_PERMS.tools)) ||
     (pathname.startsWith("/volunteers") && hasAnyRole(roles, SECTION_PERMS.volunteers)) ||
     (pathname.startsWith("/lineup") && hasAnyRole(roles, SECTION_PERMS.lineup)) ||
     (pathname.startsWith("/admin") && hasAnyRole(roles, SECTION_PERMS.admin)) ||
-    // autres routes → OK par défaut
     (!pathname.startsWith("/tools") &&
       !pathname.startsWith("/volunteers") &&
       !pathname.startsWith("/lineup") &&
       !pathname.startsWith("/admin"));
 
   if (!allow) {
-    // Connecté mais pas autorisé → 403
     return NextResponse.redirect(new URL("/403", req.url));
   }
 
@@ -48,6 +53,8 @@ export default auth((req: NextRequest & { auth?: any }) => {
 });
 
 export const config = {
-  // protège tout sauf _next/** et fichiers statiques
-  matcher: ["/((?!.+\\.[\\w]+$|_next).*)", "/"],
+  // ✅ n’applique PAS ce middleware à /api/proxy ni /api/auth ni aux assets
+  matcher: [
+    "/((?!api/proxy|api/auth|_next|static|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp|css|js|map)).*)",
+  ],
 };

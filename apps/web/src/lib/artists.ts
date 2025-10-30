@@ -1,8 +1,59 @@
 // src/lib/artists.ts
-const BASE = process.env.NEXT_PUBLIC_API_URL! + "/artists-api";
 
+/* ===============================
+   Env & base URL
+   =============================== */
+const isServer = typeof window === "undefined";
+
+// Always hit our Next proxy; relative works in both client and SSR
+const PROXY_BASE = "/api/proxy";
+
+/* ===============================
+   Generic fetch helper
+   =============================== */
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const clean = path.replace(/^\/+/, "/");
+  const url = `${PROXY_BASE}${clean.startsWith("/") ? "" : "/"}${clean}`;
+
+  // Base headers
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+    ...(init?.headers || {}),
+  };
+
+  // ✅ On the server, forward cookies to the proxy (dynamic import, no static "next/headers")
+  if (isServer) {
+    try {
+      const mod: any = await import("next/headers");
+      const ck = mod?.cookies?.();
+      const cookieStr = ck?.toString?.() || "";
+      if (cookieStr) (headers as any).cookie = cookieStr;
+    } catch {
+      // noop: if cookies can't be read, the proxy will reject and you'll see it in logs
+    }
+  }
+
+  const r = await fetch(url, {
+    cache: "no-store",
+    headers,
+    ...init,
+  });
+
+  if (!r.ok) {
+    let body = "";
+    try { body = await r.text(); } catch {}
+    console.error("[artists.ts] request failed:", r.status, url, body.slice(0, 200));
+    throw new Error(`Request failed: ${r.status} ${r.statusText} @ ${url}`);
+  }
+
+  return r.json() as Promise<T>;
+}
+
+/* ===============================
+   Types
+   =============================== */
 export type ArtistStatus = "prospect" | "pending" | "confirmed" | "canceled";
-export type Stage = "main" | "second" ;
+export type Stage = "main" | "second";
 
 export type Artist = {
   id: string;
@@ -31,34 +82,7 @@ export type Contact = {
   isPrimary: boolean;
 };
 
-export async function listArtists(params?: { q?: string; status?: ArtistStatus }) {
-  const usp = new URLSearchParams();
-  if (params?.q) usp.set("q", params.q);
-  if (params?.status) usp.set("status", params.status);
-  const r = await fetch(`${BASE}/artists${usp.toString() ? `?${usp.toString()}` : ""}`, { cache: "no-store" });
-  if (!r.ok) throw new Error("listArtists failed");
-  return r.json() as Promise<Artist[]>;
-}
-
-export async function createArtist(payload: Partial<Artist>) {
-  const r = await fetch(`${BASE}/artists`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  if (!r.ok) throw new Error("createArtist failed");
-  return r.json() as Promise<Artist>;
-}
-
-export async function updateArtist(id: string, patch: Partial<Artist>) {
-  const r = await fetch(`${BASE}/artists/${id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(patch),
-  });
-  if (!r.ok) throw new Error("updateArtist failed");
-  return r.json();
-}
+export type ArtistWithContacts = Artist & { contacts: Contact[] };
 
 export const ARTIST_STATUS: ArtistStatus[] = ["prospect", "pending", "confirmed", "canceled"];
 
@@ -69,18 +93,42 @@ export const ARTIST_STATUS_LABEL: Record<ArtistStatus, string> = {
   canceled: "Annulé",
 };
 
-export type ArtistWithContacts = Artist & { contacts: Contact[] };
-
-export async function getArtist(id: string) {
-  const r = await fetch(`${BASE}/artists/${id}`, { cache: "no-store" });
-  if (!r.ok) {
-    const msg = await r.text().catch(() => "");
-    throw new Error(`getArtist failed (${r.status}): ${msg || r.statusText}`);
-  }
-  return r.json() as Promise<ArtistWithContacts>;
+/* ===============================
+   API
+   =============================== */
+export async function listArtists(params?: { q?: string; status?: ArtistStatus }) {
+  const usp = new URLSearchParams();
+  if (params?.q) usp.set("q", params.q);
+  if (params?.status) usp.set("status", params.status);
+  const qs = usp.toString();
+  return request<Artist[]>(`/artists-api/artists${qs ? `?${qs}` : ""}`);
 }
 
-// ---- Coûts artiste ----
+export async function createArtist(payload: Partial<Artist>) {
+  return request<Artist>(`/artists-api/artists`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateArtist(id: string, patch: Partial<Artist>) {
+  return request(`/artists-api/artists/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
+}
+
+export async function getArtist(id: string) {
+  return request<ArtistWithContacts>(`/artists-api/artists/${id}`);
+}
+
+export async function deleteArtist(id: string) {
+  return request(`/artists-api/artists/${id}`, { method: "DELETE" });
+}
+
+/* ===============================
+   Artist Costs
+   =============================== */
 export type ArtistCost = {
   id: string;
   artistId: string;
@@ -92,61 +140,45 @@ export type ArtistCost = {
 };
 
 export async function listArtistCosts(artistId: string) {
-  const r = await fetch(`${BASE}/artists/${artistId}/costs`, { cache: "no-store" });
-  if (!r.ok) throw new Error("listArtistCosts failed");
-  return r.json() as Promise<ArtistCost[]>;
+  return request<ArtistCost[]>(`/artists-api/artists/${artistId}/costs`);
 }
 
 export async function createArtistCost(artistId: string, payload: Partial<ArtistCost>) {
-  const r = await fetch(`${BASE}/artists/${artistId}/costs`, {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+  return request<ArtistCost>(`/artists-api/artists/${artistId}/costs`, {
+    method: "POST",
+    body: JSON.stringify(payload),
   });
-  if (!r.ok) throw new Error("createArtistCost failed");
-  return r.json() as Promise<ArtistCost>;
 }
 
 export async function updateArtistCost(costId: string, patch: Partial<ArtistCost>) {
-  const r = await fetch(`${BASE}/artist-costs/${costId}`, {
-    method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch),
+  // endpoint API: /artists-api/artist-costs/:id
+  return request(`/artists-api/artist-costs/${costId}`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
   });
-  if (!r.ok) throw new Error("updateArtistCost failed");
-  return r.json();
 }
 
 export async function deleteArtistCost(costId: string) {
-  const r = await fetch(`${BASE}/artist-costs/${costId}`, { method: "DELETE" });
-  if (!r.ok) throw new Error("deleteArtistCost failed");
-  return r.json();
+  return request(`/artists-api/artist-costs/${costId}`, { method: "DELETE" });
 }
-// --- contacts ---
+
+/* ===============================
+   Contacts
+   =============================== */
 export async function createContact(artistId: string, payload: Partial<Contact>) {
-  const r = await fetch(`${BASE}/artists/${artistId}/contacts`, {
+  return request<Contact>(`/artists-api/artists/${artistId}/contacts`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  if (!r.ok) throw new Error("createContact failed");
-  return r.json() as Promise<Contact>;
 }
 
 export async function updateContact(contactId: string, patch: Partial<Contact>) {
-  const r = await fetch(`${BASE}/contacts/${contactId}`, {
+  return request(`/artists-api/contacts/${contactId}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(patch),
   });
-  if (!r.ok) throw new Error("updateContact failed");
-  return r.json();
 }
 
 export async function deleteContact(contactId: string) {
-  const r = await fetch(`${BASE}/contacts/${contactId}`, { method: "DELETE" });
-  if (!r.ok) throw new Error("deleteContact failed");
-  return r.json();
-}
-
-export async function deleteArtist(id: string) {
-  const r = await fetch(`${BASE}/artists/${id}`, { method: "DELETE" });
-  if (!r.ok) throw new Error("deleteArtist failed");
-  return r.json();
+  return request(`/artists-api/contacts/${contactId}`, { method: "DELETE" });
 }

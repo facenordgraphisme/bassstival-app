@@ -1,4 +1,3 @@
-// src/lib/admin-users.ts
 export type AdminUser = {
   id: string;
   name: string;
@@ -24,7 +23,6 @@ type UpdateUserInput = {
 // Helper générique: passe par le proxy Next (/api/proxy/**)
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`/api/proxy/${path}`, {
-    // NOTE: pas besoin d’ajouter Authorization ici, le proxy s’en charge
     ...init,
     headers: {
       "Content-Type": "application/json",
@@ -32,23 +30,33 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
     },
   });
 
+
   // Essaie de parser du JSON dans tous les cas (utile pour extraire une erreur lisible)
-  let data: any = null;
   const text = await res.text();
+
+  // On garde le résultat en "unknown" pour éviter any
+  let parsed: unknown = null;
   try {
-    data = text ? JSON.parse(text) : null;
+    parsed = text ? JSON.parse(text) : null;
   } catch {
-    data = text || null;
+    parsed = text; // du texte brut
   }
 
   if (!res.ok) {
-    const msg =
-      (data && (data.error || data.message)) ||
-      `Erreur API (${res.status})`;
+    let msg = `Erreur API (${res.status})`;
+
+    if (typeof parsed === "object" && parsed !== null) {
+      const maybe = parsed as { error?: string; message?: string };
+      msg = maybe.error || maybe.message || msg;
+    } else if (typeof parsed === "string" && parsed.trim()) {
+      msg = parsed;
+    }
+
     throw new Error(msg);
   }
 
-  return data as T;
+  // Ici on fait confiance au type générique T fourni par l'appelant
+  return parsed as T;
 }
 
 /** -------- CRUD -------- **/

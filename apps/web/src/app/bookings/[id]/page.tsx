@@ -1,61 +1,38 @@
-// src/app/bookings/[id]/page.tsx
-import { FadeUp } from "@/components/FX";
-import BackButton from "@/components/BackButton";
-import { getBooking } from "@/lib/bookings";
-import { getArtist } from "@/lib/artists";
+import { cookies } from "next/headers";
 import BookingDetailsClient from "./booking-details-client";
 
-type Params = { id: string };
-type InitialBooking = Awaited<ReturnType<typeof getBooking>>;
+export default async function Page({ params }: { params: { id: string } }) {
+  const base =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.NEXTAUTH_URL ||
+    "http://localhost:3000";
 
-export default async function BookingDetailsPage({
-  params,
-}: {
-  params: Promise<Params>; // 👈 async
-}) {
-  const { id } = await params; // 👈 on attend params
+  const ck = cookies().toString(); // récupère le cookie session utilisateur
 
-  let initial: InitialBooking | null = null;
-  let artistName: string | null = null;
+  const br = await fetch(`${base}/api/proxy/artists-api/bookings/${params.id}`, {
+    cache: "no-store",
+    headers: { cookie: ck },
+  });
 
-  try {
-    initial = await getBooking(id);
-
-    // Si le booking existe, on récupère le nom de l'artiste lié
-    if (initial?.artistId) {
-      try {
-        const artist = await getArtist(initial.artistId);
-        artistName = artist?.name ?? null;
-      } catch {
-        artistName = null;
-      }
-    }
-  } catch {
-    initial = null;
+  if (!br.ok) {
+    const body = await br.text().catch(() => "");
+    console.error(
+      `❌ Booking fetch failed: ${br.status} ${br.statusText}`,
+      body.slice(0, 300)
+    );
+    throw new Error(`Failed to load booking ${params.id}`);
   }
 
-  return (
-    <FadeUp className="space-y-6">
-      <div className="flex items-center gap-3">
-        <BackButton className="!px-2.5 !py-1.5 mt-2 mr-2" />
-        <h1
-          className="text-3xl font-extrabold title-underline flex flex-wrap items-center gap-2"
-          style={{ fontFamily: "var(--font-title)" }}
-        >
-          Détail booking
-          {artistName && (
-            <span className="text-xl font-normal opacity-80">
-              – {artistName}
-            </span>
-          )}
-        </h1>
-      </div>
+  const initial = await br.json();
 
-      {!initial ? (
-        <div className="text-sm opacity-70">Booking introuvable.</div>
-      ) : (
-        <BookingDetailsClient initial={initial} />
-      )}
-    </FadeUp>
-  );
+  let initialArtist: any | null = null;
+  if (initial?.artistId) {
+    const ar = await fetch(`${base}/api/proxy/artists-api/artists/${initial.artistId}`, {
+      cache: "no-store",
+      headers: { cookie: ck },
+    });
+    if (ar.ok) initialArtist = await ar.json();
+  }
+
+  return <BookingDetailsClient initial={initial} initialArtist={initialArtist} />;
 }

@@ -3,51 +3,86 @@
 import useSWR from "swr";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { listUsers, createUser, updateUser, deleteUser, type AdminUser, ALL_ROLES } from "@/lib/admin-users";
+import {
+  listUsers,
+  createUser,
+  updateUser,
+  deleteUser,
+  type AdminUser,
+  ALL_ROLES,
+} from "@/lib/admin-users";
 import { Search, Plus, Trash2, Pencil } from "lucide-react";
 
 export default function AdminUsersClient() {
-  const { data, mutate, isLoading } = useSWR<AdminUser[]>(["admin-users"], listUsers, {
-    keepPreviousData: true,
-    fallbackData: [],
-  });
+  const { data, mutate, isLoading } = useSWR<AdminUser[]>(
+    ["admin-users"],
+    listUsers,
+    { keepPreviousData: true, fallbackData: [] }
+  );
 
   const [q, setQ] = useState("");
   const filtered = useMemo(() => {
     const rows = data ?? [];
     if (!q.trim()) return rows;
     const s = q.toLowerCase();
-    return rows.filter(u => [u.name, u.email, (u.roles || []).join(" ")].join(" ").toLowerCase().includes(s));
+    return rows.filter((u) =>
+      [u.name, u.email, (u.roles || []).join(" ")]
+        .join(" ")
+        .toLowerCase()
+        .includes(s)
+    );
   }, [data, q]);
 
   // Create form
   const [showCreate, setShowCreate] = useState(false);
-  const [form, setForm] = useState({ name: "", email: "", password: "", roles: [] as string[] });
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    password: "",
+    roles: [] as string[],
+  });
 
   const toggleFormRole = (role: string) =>
     setForm((f) => ({
       ...f,
-      roles: f.roles.includes(role) ? f.roles.filter((r) => r !== role) : [...f.roles, role],
+      roles: f.roles.includes(role)
+        ? f.roles.filter((r) => r !== role)
+        : [...f.roles, role],
     }));
 
   const onCreate = async () => {
-    if (!form.email || !form.password) return toast.error("Email et mot de passe requis");
+    if (!form.email || !form.password)
+      return toast.error("Email et mot de passe requis");
     const t = toast.loading("Création…");
     try {
-      await createUser({ name: form.name || form.email, email: form.email, password: form.password, roles: form.roles });
+      await createUser({
+        name: form.name || form.email,
+        email: form.email,
+        password: form.password,
+        roles: form.roles,
+      });
       toast.success("Utilisateur créé", { id: t });
       setForm({ name: "", email: "", password: "", roles: [] });
       setShowCreate(false);
       mutate();
-    } catch (e: any) {
-      toast.error(e?.message || "Erreur création", { id: t });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Erreur création";
+      toast.error(msg, { id: t });
     }
   };
 
   // Edit
   const [edit, setEdit] = useState<AdminUser | null>(null);
-  const [editForm, setEditForm] = useState<{ name: string; email: string; password: string; roles: string[] }>({
-    name: "", email: "", password: "", roles: [],
+  const [editForm, setEditForm] = useState<{
+    name: string;
+    email: string;
+    password: string;
+    roles: string[];
+  }>({
+    name: "",
+    email: "",
+    password: "",
+    roles: [],
   });
 
   const openEdit = (u: AdminUser) => {
@@ -58,7 +93,9 @@ export default function AdminUsersClient() {
   const toggleEditRole = (role: string) =>
     setEditForm((f) => ({
       ...f,
-      roles: f.roles.includes(role) ? f.roles.filter((r) => r !== role) : [...f.roles, role],
+      roles: f.roles.includes(role)
+        ? f.roles.filter((r) => r !== role)
+        : [...f.roles, role],
     }));
 
   const onSave = async () => {
@@ -74,8 +111,9 @@ export default function AdminUsersClient() {
       toast.success("Modifié", { id: t });
       setEdit(null);
       mutate();
-    } catch (e: any) {
-      toast.error(e?.message || "Erreur", { id: t });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Erreur";
+      toast.error(msg, { id: t });
     }
   };
 
@@ -85,8 +123,9 @@ export default function AdminUsersClient() {
       await deleteUser(id);
       toast.success("Supprimé", { id: t });
       mutate();
-    } catch (e: any) {
-      toast.error(e?.message || "Erreur", { id: t });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Erreur";
+      toast.error(msg, { id: t });
     }
   };
 

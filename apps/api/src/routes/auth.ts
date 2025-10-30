@@ -1,7 +1,7 @@
 // apps/api/src/routes/auth.ts
 import { Router, type Request, type Response, type NextFunction } from "express";
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
+import jwt, { type JwtPayload } from "jsonwebtoken";
 
 const router = Router();
 
@@ -18,23 +18,40 @@ export type User = {
 // ⚠️ In-memory (non persistant). Remplace par DB plus tard.
 const users: User[] = [];
 
-/* ------------------------- Constantes & Utils ------------------------ */
-
+/** Rôles autorisés */
 const ROLES = ["admin", "staff", "tools", "volunteers", "lineup"] as const;
 type Role = (typeof ROLES)[number];
 
 function isValidRoles(input: unknown): input is Role[] {
-  return Array.isArray(input) && input.every((r) => (ROLES as readonly string[]).includes(r));
+  return Array.isArray(input) && input.every((r) => (ROLES as readonly string[]).includes(r as Role));
 }
 
-function safeUser(u: User) {
+/** Représentation sûre d'un user (sans hash) */
+type PublicUser = Omit<User, "passwordHash">;
+function safeUser(u: User): PublicUser {
   const { passwordHash, ...rest } = u;
   return rest;
 }
 
+/** Claims que l'on met dans le JWT */
+type AuthClaims = {
+  sub: string;
+  email: string;
+  name: string;
+  roles: Role[];
+  iat?: number;
+  exp?: number;
+};
+
+/** Request avec user injecté par requireAuth */
+type AuthedRequest = Request & { user?: AuthClaims };
+
+/* ------------------------- Helpers ------------------------ */
+
 function getUserByEmail(email?: string | null) {
   if (!email) return undefined;
-  return users.find((u) => u.email.toLowerCase() === String(email).toLowerCase());
+  const norm = String(email).toLowerCase();
+  return users.find((u) => u.email.toLowerCase() === norm);
 }
 
 async function createUser(email: string, name: string, password: string, roles: Role[]) {
@@ -49,16 +66,23 @@ const JWT_SECRET =
   process.env.AUTH_JWT_SECRET ||
   "dev_fallback_secret_change_me"; // évite crash en dev
 
-const TOKEN_TTL_HOURS = Number(process.env.API_TOKEN_TTL_HOURS ?? process.env.AUTH_TOKEN_TTL_HOURS ?? 12);
+const TOKEN_TTL_HOURS = Number(
+  process.env.API_TOKEN_TTL_HOURS ?? process.env.AUTH_TOKEN_TTL_HOURS ?? 12
+);
 
+/** Signe le JWT avec les champs attendus */
 function signToken(user: User) {
-  const payload = { sub: user.id, email: user.email, name: user.name, roles: user.roles };
+  const payload: Omit<AuthClaims, "iat" | "exp"> = {
+    sub: user.id,
+    email: user.email,
+    name: user.name,
+    roles: user.roles as Role[],
+  };
   return jwt.sign(payload, JWT_SECRET, { expiresIn: `${TOKEN_TTL_HOURS}h` });
 }
 
 /* ----------------------------- Seed admin ---------------------------- */
 
-// Évite de dupliquer si hot-reload / dev
 async function seedAdmin() {
   const email = process.env.ADMIN_EMAIL;
   const pass = process.env.ADMIN_PASSWORD;
@@ -70,14 +94,29 @@ seedAdmin().catch(() => {});
 
 /* --------------------------- Middlewares ----------------------------- */
 
-export function requireAuth(req: Request, res: Response, next: NextFunction) {
+export function requireAuth(req: AuthedRequest, res: Response, next: NextFunction) {
   const header = req.headers.authorization || "";
   const match = header.match(/^Bearer\s+(.+)$/i);
   if (!match) return res.status(401).json({ error: "Missing bearer token" });
 
   try {
-    const claims = jwt.verify(match[1], JWT_SECRET) as any;
-    (req as any).user = claims;
+    const decoded = jwt.verify(match[1], JWT_SECRET) as JwtPayload;
+
+    // Sécurise/normalise les champs
+    const roles: Role[] = Array.isArray(decoded.roles)
+      ? (decoded.roles.filter((r) => (ROLES as readonly string[]).includes(r as Role)) as Role[])
+      : [];
+
+    const claims: AuthClaims = {
+      sub: String(decoded.sub ?? ""),
+      email: String((decoded as any).email ?? ""), // `email` n'est pas standard dans JwtPayload
+      name: String((decoded as any).name ?? ""),
+      roles,
+      iat: decoded.iat,
+      exp: decoded.exp,
+    };
+
+    req.user = claims;
     return next();
   } catch {
     return res.status(401).json({ error: "Invalid token" });
@@ -85,8 +124,8 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
 }
 
 export function requireRoles(...allowed: Role[]) {
-  return (req: Request, res: Response, next: NextFunction) => {
-    const roles: string[] = ((req as any).user?.roles) || [];
+  return (req: AuthedRequest, res: Response, next: NextFunction) => {
+    const roles: Role[] = req.user?.roles ?? [];
     if (!allowed.some((r) => roles.includes(r))) {
       return res.status(403).json({ error: "Forbidden" });
     }
@@ -98,22 +137,21 @@ export function requireRoles(...allowed: Role[]) {
 
 // POST /auth/login
 router.post("/login", async (req: Request, res: Response) => {
-  const { email, password } = req.body ?? {};
+  const { email, password } = (req.body ?? {}) as { email?: string; password?: string };
 
   const user = getUserByEmail(email);
   if (!user) return res.status(401).json({ error: "Invalid credentials" });
 
-  const ok = await bcrypt.compare(String(password || ""), user.passwordHash);
+  const ok = await bcrypt.compare(String(password ?? ""), user.passwordHash);
   if (!ok) return res.status(401).json({ error: "Invalid credentials" });
 
   const token = signToken(user);
   return res.json({ ...safeUser(user), token });
 });
 
-// GET /auth/me  (debug/outil)
-router.get("/me", requireAuth, (req: Request, res: Response) => {
-  const claims = (req as any).user;
-  return res.json({ ok: true, user: claims });
+// GET /auth/me (debug)
+router.get("/me", requireAuth, (req: AuthedRequest, res: Response) => {
+  return res.json({ ok: true, user: req.user });
 });
 
 // GET /auth/users
@@ -122,51 +160,79 @@ router.get("/users", requireAuth, requireRoles("admin"), (_req: Request, res: Re
 });
 
 // POST /auth/users
-router.post("/users", requireAuth, requireRoles("admin"), async (req: Request, res: Response) => {
-  const { email, name, password, roles } = req.body ?? {};
+router.post(
+  "/users",
+  requireAuth,
+  requireRoles("admin"),
+  async (req: Request, res: Response) => {
+    const { email, name, password, roles } = (req.body ?? {}) as {
+      email?: string;
+      name?: string;
+      password?: string;
+      roles?: unknown;
+    };
 
-  if (!email || !password) return res.status(400).json({ error: "Missing email/password" });
-  if (getUserByEmail(email)) return res.status(409).json({ error: "Email exists" });
-  if (roles && !isValidRoles(roles)) return res.status(400).json({ error: "Invalid roles" });
+    if (!email || !password) return res.status(400).json({ error: "Missing email/password" });
+    if (getUserByEmail(email)) return res.status(409).json({ error: "Email exists" });
+    if (roles && !isValidRoles(roles)) return res.status(400).json({ error: "Invalid roles" });
 
-  const u = await createUser(String(email), String(name || email), String(password), (roles ?? []) as Role[]);
-  return res.status(201).json(safeUser(u));
-});
+    const u = await createUser(String(email), String(name || email), String(password), (roles ?? []) as Role[]);
+    return res.status(201).json(safeUser(u));
+  }
+);
 
 // PATCH /auth/users/:id
-router.patch("/users/:id", requireAuth, requireRoles("admin"), async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const u = users.find((x) => x.id === id);
-  if (!u) return res.status(404).json({ error: "Not found" });
+router.patch(
+  "/users/:id",
+  requireAuth,
+  requireRoles("admin"),
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const u = users.find((x) => x.id === id);
+    if (!u) return res.status(404).json({ error: "Not found" });
 
-  const { name, email, password, roles } = req.body ?? {};
+    const { name, email, password, roles } = (req.body ?? {}) as {
+      name?: string;
+      email?: string;
+      password?: string;
+      roles?: unknown;
+    };
 
-  if (typeof name === "string") u.name = name;
-  if (typeof email === "string") {
-    // garde l’unicité email
-    if (getUserByEmail(email) && getUserByEmail(email)?.id !== u.id) {
-      return res.status(409).json({ error: "Email exists" });
+    if (typeof name === "string") u.name = name;
+
+    if (typeof email === "string") {
+      const existing = getUserByEmail(email);
+      if (existing && existing.id !== u.id) {
+        return res.status(409).json({ error: "Email exists" });
+      }
+      u.email = email;
     }
-    u.email = email;
-  }
-  if (Array.isArray(roles)) {
-    if (!isValidRoles(roles)) return res.status(400).json({ error: "Invalid roles" });
-    u.roles = roles as Role[];
-  }
-  if (typeof password === "string" && password.trim()) {
-    u.passwordHash = await bcrypt.hash(password, 10);
-  }
 
-  return res.json(safeUser(u));
-});
+    if (Array.isArray(roles)) {
+      if (!isValidRoles(roles)) return res.status(400).json({ error: "Invalid roles" });
+      u.roles = roles as Role[];
+    }
+
+    if (typeof password === "string" && password.trim()) {
+      u.passwordHash = await bcrypt.hash(password, 10);
+    }
+
+    return res.json(safeUser(u));
+  }
+);
 
 // DELETE /auth/users/:id
-router.delete("/users/:id", requireAuth, requireRoles("admin"), (req: Request, res: Response) => {
-  const { id } = req.params;
-  const idx = users.findIndex((x) => x.id === id);
-  if (idx === -1) return res.status(404).json({ error: "Not found" });
-  users.splice(idx, 1);
-  return res.json({ ok: true });
-});
+router.delete(
+  "/users/:id",
+  requireAuth,
+  requireRoles("admin"),
+  (req: Request, res: Response) => {
+    const { id } = req.params;
+    const idx = users.findIndex((x) => x.id === id);
+    if (idx === -1) return res.status(404).json({ error: "Not found" });
+    users.splice(idx, 1);
+    return res.json({ ok: true });
+  }
+);
 
 export default router;

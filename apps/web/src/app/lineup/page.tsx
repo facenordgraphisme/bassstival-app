@@ -48,7 +48,7 @@ export default function LineupHome() {
         />
         <Tile
           href="/bookings"
-          title="Créneaux"
+          title="Bookings"
           desc="Créneaux et scènes par artiste."
           icon={<CalendarClock size={28} aria-hidden />}
         />

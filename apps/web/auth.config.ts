@@ -11,6 +11,7 @@ const authConfig = {
 
       // Routes publiques
       if (pathname.startsWith("/api/auth")) return true;
+      if (pathname.startsWith("/api/proxy")) return true;
       if (pathname === "/login") return true;
 
       // Pas connecté → refuse

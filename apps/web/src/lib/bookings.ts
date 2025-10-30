@@ -1,17 +1,55 @@
 // src/lib/bookings.ts
 import type { Stage } from "./artists";
 
-const BASE = process.env.NEXT_PUBLIC_API_URL! + "/artists-api";
+/* ===============================
+   Env & base URL
+   =============================== */
+const isServer = typeof window === "undefined";
+const PROXY_BASE = "/api/proxy";
 
-// ---- Statuts de booking (source unique) ----
+/* ===============================
+   Generic fetch helper
+   =============================== */
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const clean = path.replace(/^\/+/, "/");
+  const url = `${PROXY_BASE}${clean.startsWith("/") ? "" : "/"}${clean}`;
+
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+    ...(init?.headers || {}),
+  };
+
+  // ✅ Forward cookies only on the server via dynamic import
+  if (isServer) {
+    try {
+      const mod: any = await import("next/headers");
+      const ck = mod?.cookies?.();
+      const cookieStr = ck?.toString?.() || "";
+      if (cookieStr) (headers as any).cookie = cookieStr;
+    } catch {}
+  }
+
+  const r = await fetch(url, {
+    cache: "no-store",
+    headers,
+    ...init,
+  });
+
+  if (!r.ok) {
+    let body = "";
+    try { body = await r.text(); } catch {}
+    console.error("[bookings.ts] request failed:", r.status, url, body.slice(0, 200));
+    throw new Error(`Request failed: ${r.status} ${r.statusText} @ ${url}`);
+  }
+  return r.json() as Promise<T>;
+}
+
+/* ===============================
+   Types + Status
+   =============================== */
 export type BookingStatus = "draft" | "confirmed" | "played" | "canceled";
 
-export const BOOKING_STATUS: BookingStatus[] = [
-  "draft",
-  "confirmed",
-  "played",
-  "canceled",
-];
+export const BOOKING_STATUS: BookingStatus[] = ["draft", "confirmed", "played", "canceled"];
 
 export const BOOKING_STATUS_LABEL: Record<BookingStatus, string> = {
   draft: "Brouillon",
@@ -20,15 +58,13 @@ export const BOOKING_STATUS_LABEL: Record<BookingStatus, string> = {
   canceled: "Annulé",
 };
 
-// Ajuste si tu crées une classe .badge-blue ; sinon on garde .badge de base
 export const BOOKING_STATUS_BADGE: Record<BookingStatus, string> = {
   draft: "badge",
   confirmed: "badge badge-green",
-  played: "badge",           // <- pas de .badge-blue dans ton CSS actuel
+  played: "badge",
   canceled: "badge badge-red",
 };
 
-// ---- Types ----
 export type Booking = {
   id: string;
   artistId: string;
@@ -46,7 +82,9 @@ export type Booking = {
   createdAt?: string | null;
 };
 
-// ---- API ----
+/* ===============================
+   API
+   =============================== */
 export async function listBookings(params?: {
   artistId?: string;
   stage?: Stage;
@@ -60,44 +98,32 @@ export async function listBookings(params?: {
   if (params?.status) usp.set("status", params.status);
   if (params?.from) usp.set("from", params.from);
   if (params?.to) usp.set("to", params.to);
-  const r = await fetch(`${BASE}/bookings${usp.toString() ? `?${usp.toString()}` : ""}`, { cache: "no-store" });
-  if (!r.ok) throw new Error("listBookings failed");
-  return r.json() as Promise<Booking[]>;
+  const qs = usp.toString();
+  return request<Booking[]>(`/artists-api/bookings${qs ? `?${qs}` : ""}`);
 }
 
 export async function createBooking(payload: Partial<Booking>) {
-  const r = await fetch(`${BASE}/bookings`, {
+  return request<Booking>(`/artists-api/bookings`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  if (!r.ok) throw new Error("createBooking failed");
-  return r.json() as Promise<Booking>;
 }
 
 export async function getBooking(id: string) {
-  const r = await fetch(`${BASE}/bookings/${id}`, { cache: "no-store" });
-  if (!r.ok) throw new Error("getBooking failed");
-  return r.json() as Promise<Booking & { costs: BookingCost[] }>;
+  return request<Booking & { costs: BookingCost[] }>(`/artists-api/bookings/${id}`);
 }
 
 export async function updateBooking(id: string, patch: Partial<Booking>) {
-  const r = await fetch(`${BASE}/bookings/${id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(patch),
-  });
-  if (!r.ok) throw new Error("updateBooking failed");
-  return r.json();
+  return request(`/artists-api/bookings/${id}`, { method: "PATCH", body: JSON.stringify(patch) });
 }
 
 export async function deleteBooking(id: string) {
-  const r = await fetch(`${BASE}/bookings/${id}`, { method: "DELETE" });
-  if (!r.ok) throw new Error("deleteBooking failed");
-  return r.json();
+  return request(`/artists-api/bookings/${id}`, { method: "DELETE" });
 }
 
-// ---- Costs ----
+/* ===============================
+   Costs
+   =============================== */
 export type BookingCost = {
   id: string;
   bookingId: string;
@@ -109,35 +135,21 @@ export type BookingCost = {
 };
 
 export async function listBookingCosts(bookingId: string) {
-  const r = await fetch(`${BASE}/bookings/${bookingId}/costs`, { cache: "no-store" });
-  if (!r.ok) throw new Error("listBookingCosts failed");
-  return r.json() as Promise<BookingCost[]>;
+  return request<BookingCost[]>(`/artists-api/bookings/${bookingId}/costs`);
 }
 
 export async function createBookingCost(bookingId: string, payload: Partial<BookingCost>) {
-  const r = await fetch(`${BASE}/bookings/${bookingId}/costs`, {
+  return request<BookingCost>(`/artists-api/bookings/${bookingId}/costs`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  if (!r.ok) throw new Error("createBookingCost failed");
-  return r.json() as Promise<BookingCost>;
 }
 
 export async function updateBookingCost(costId: string, patch: Partial<BookingCost>) {
-  // ✅ corrige l’URL (enlève artists-api en double)
-  const r = await fetch(`${BASE}/costs/${costId}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(patch),
-  });
-  if (!r.ok) throw new Error("updateBookingCost failed");
-  return r.json();
+  // endpoint côté API: /artists-api/costs/:id
+  return request(`/artists-api/costs/${costId}`, { method: "PATCH", body: JSON.stringify(patch) });
 }
 
 export async function deleteBookingCost(costId: string) {
-  // ✅ corrige l’URL (enlève artists-api en double)
-  const r = await fetch(`${BASE}/costs/${costId}`, { method: "DELETE" });
-  if (!r.ok) throw new Error("deleteBookingCost failed");
-  return r.json();
+  return request(`/artists-api/costs/${costId}`, { method: "DELETE" });
 }

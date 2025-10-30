@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import useSWR from "swr";
+import Link from "next/link";
 import { toast } from "sonner";
+
 import {
   type Booking,
   type BookingCost,
@@ -16,167 +18,118 @@ import {
   BOOKING_STATUS_LABEL,
 } from "@/lib/bookings";
 import { STAGE_LABEL } from "@/lib/utils-booking";
-import type { Stage, } from "@/lib/artists";
-import Link from "next/link";
+import type { Stage } from "@/lib/artists";
 import { getArtist, type ArtistWithContacts } from "@/lib/artists";
 
 function errMsg(e: unknown): string {
   return e instanceof Error ? e.message : "Erreur";
 }
 
-export default function BookingDetailsClient({ initial }: { initial: Booking & { costs: BookingCost[] } }) {
+function toLocalInput(iso?: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  const mm = pad(d.getMonth() + 1);
+  const dd = pad(d.getDate());
+  const hh = pad(d.getHours());
+  const mi = pad(d.getMinutes());
+  return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+}
+
+export default function BookingDetailsClient({
+  initial,
+  initialArtist,
+}: {
+  initial: Booking & { costs: BookingCost[] };
+  initialArtist?: ArtistWithContacts | null;
+}) {
   const bookingId = initial.id;
+  const artistId = initial.artistId;
 
-  // Onglets (+ "artist")
-  const [tab, setTab] = useState<"timing" | "log" | "finance" | "artist">("timing");
+  const [tab, setTab] =
+    useState<"timing" | "log" | "finance" | "artist">("timing");
 
-  // SWR artiste lié (pour import + onglet Artist)
-  const { data: artist } = useSWR<ArtistWithContacts>(
-    ["booking-artist", initial.artistId],
-    () => getArtist(initial.artistId),
-    { revalidateOnFocus: false }
+  // ---- ARTISTE (source de vérité pour log & cachet)
+  const {
+    data: artist,
+    error: artistError,
+    isLoading: artistLoading,
+  } = useSWR<ArtistWithContacts>(
+    artistId ? ["booking-artist", artistId] : null, // pas d'appel si pas d'ID
+    () => getArtist(artistId),
+    { revalidateOnFocus: false, fallbackData: initialArtist ?? undefined }
   );
 
-  // SWR coûts booking
+  // (petit bandeau debug facultatif)
+  const Debug =
+    process.env.NODE_ENV !== "production" ? (
+      <div className="text-xs opacity-60">
+        bookingId={bookingId} • artistId={artistId || "—"} • artistLoading=
+        {String(artistLoading)} • artistError={artistError?.message || "—"}
+      </div>
+    ) : null;
+
+  // ---- COÛTS booking
   const { data: costs, mutate: mutateCosts } = useSWR<BookingCost[]>(
     ["booking-costs", bookingId],
     () => listBookingCosts(bookingId),
     { fallbackData: initial.costs }
   );
 
-  // --- Timing
+  // ---- TIMING
   const [formTiming, setFormTiming] = useState<{
-    stage: Stage;
-    status: BookingStatus;
-    startAt: string;
-    endAt: string;
-  }>({
-    stage: (initial.stage ?? "main") as Stage,
-    status: initial.status,
-    startAt: initial.startAt.slice(0, 16),
-    endAt: initial.endAt.slice(0, 16),
-  });
+  stage: Stage;
+  status: BookingStatus;
+  startAt: string;
+  endAt: string;
+}>({
+  stage: (initial.stage ?? "main") as Stage,
+  status: initial.status,
+  startAt: toLocalInput(initial.startAt),
+  endAt: toLocalInput(initial.endAt),
+});
 
-  const saveTiming = async () => {
-    const t = toast.loading("Sauvegarde…");
-    try {
-      await updateBooking(bookingId, {
-        stage: formTiming.stage,
-        status: formTiming.status,
-        startAt: new Date(formTiming.startAt).toISOString(),
-        endAt: new Date(formTiming.endAt).toISOString(),
-      });
-      toast.success("Timing mis à jour", { id: t });
-    } catch (e: unknown) {
-      toast.error(errMsg(e), { id: t });
-    }
-  };
+const saveTiming = async () => {
+  const t = toast.loading("Sauvegarde…");
+  try {
+    await updateBooking(bookingId, {
+      stage: formTiming.stage,
+      status: formTiming.status,
+      startAt: formTiming.startAt ? new Date(formTiming.startAt).toISOString() : undefined,
+      endAt: formTiming.endAt ? new Date(formTiming.endAt).toISOString() : undefined,
+    });
+    toast.success("Timing mis à jour", { id: t });
+  } catch (e) {
+    toast.error(errMsg(e), { id: t });
+  }
+};
 
-  // --- Logistique (booking)
-  const [formLog, setFormLog] = useState({
-    hospitalityNotes: initial.hospitalityNotes ?? "",
-    techRider: initial.techRider ?? "",
-    travelNotes: initial.travelNotes ?? "",
-    pickupAt: initial.pickupAt ? initial.pickupAt.slice(0, 16) : "",
-    pickupLocation: initial.pickupLocation ?? "",
-  });
-
-  const saveLog = async () => {
-    const t = toast.loading("Sauvegarde…");
-    try {
-      await updateBooking(bookingId, {
-        hospitalityNotes: formLog.hospitalityNotes || null,
-        techRider: formLog.techRider || null,
-        travelNotes: formLog.travelNotes || null,
-        pickupAt: formLog.pickupAt ? new Date(formLog.pickupAt).toISOString() : null,
-        pickupLocation: formLog.pickupLocation || null,
-      });
-      toast.success("Logistique mise à jour", { id: t });
-    } catch (e: unknown) {
-      toast.error(errMsg(e), { id: t });
-    }
-  };
-
-  // 👉 Import logistique depuis l’artiste
-  const importLogFromArtist = async () => {
-    if (!artist) {
-      toast.error("Artiste introuvable");
-      return;
-    }
-    const t = toast.loading("Import depuis l’artiste…");
-    try {
-      // maj UI
-      setFormLog({
-        hospitalityNotes: artist.hospitalityNotes ?? "",
-        techRider: artist.techRider ?? "",
-        travelNotes: artist.travelNotes ?? "",
-        pickupAt: artist.pickupAt ? artist.pickupAt.slice(0, 16) : "",
-        pickupLocation: artist.pickupLocation ?? "",
-      });
-      // maj DB (booking)
-      await updateBooking(bookingId, {
-        hospitalityNotes: artist.hospitalityNotes ?? null,
-        techRider: artist.techRider ?? null,
-        travelNotes: artist.travelNotes ?? null,
-        pickupAt: artist.pickupAt ?? null,
-        pickupLocation: artist.pickupLocation ?? null,
-      });
-      toast.success("Logistique importée depuis l’artiste", { id: t });
-    } catch (e: unknown) {
-      toast.error(errMsg(e), { id: t });
-    }
-  };
-
-  // --- Finances (booking)
-  const [fee, setFee] = useState<string>(initial.feeAmount ? (initial.feeAmount / 100).toFixed(2) : "");
-  const saveFee = async () => {
-    const cents = Math.round((Number(fee.replace(",", ".")) || 0) * 100);
-    const t = toast.loading("Sauvegarde…");
-    try {
-      await updateBooking(bookingId, { feeAmount: cents, feeCurrency: "EUR" });
-      toast.success("Cachet mis à jour", { id: t });
-    } catch (e: unknown) {
-      toast.error(errMsg(e), { id: t });
-    }
-  };
-
-  // 👉 Import finances depuis l’artiste
-  const importFinanceFromArtist = async () => {
-    if (!artist) {
-      toast.error("Artiste introuvable");
-      return;
-    }
-    const t = toast.loading("Import depuis l’artiste…");
-    try {
-      const cents = artist.feeAmount ?? null;
-      setFee(artist.feeAmount ? (artist.feeAmount / 100).toFixed(2) : "");
-      await updateBooking(bookingId, { feeAmount: cents, feeCurrency: artist.feeCurrency ?? "EUR" });
-      toast.success("Finances importées depuis l’artiste", { id: t });
-    } catch (e: unknown) {
-      toast.error(errMsg(e), { id: t });
-    }
-  };
-
+  // ---- COÛTS booking (create/toggle/delete)
   const [newCost, setNewCost] = useState({ label: "", amount: "" });
   const addCost = async () => {
     if (!newCost.label || !newCost.amount) return;
     const cents = Math.round((Number(newCost.amount.replace(",", ".")) || 0) * 100);
     const t = toast.loading("Ajout…");
     try {
-      await createBookingCost(bookingId, { label: newCost.label, amount: cents, currency: "EUR", paid: false });
+      await createBookingCost(bookingId, {
+        label: newCost.label,
+        amount: cents,
+        currency: "EUR",
+        paid: false,
+      });
       setNewCost({ label: "", amount: "" });
       toast.success("Coût ajouté", { id: t });
       mutateCosts();
-    } catch (e: unknown) {
+    } catch (e) {
       toast.error(errMsg(e), { id: t });
     }
   };
-
   const togglePaid = async (c: BookingCost) => {
     await updateBookingCost(c.id, { paid: !c.paid });
     mutateCosts();
   };
-
   const delCost = async (c: BookingCost) => {
     await deleteBookingCost(c.id);
     mutateCosts();
@@ -184,7 +137,39 @@ export default function BookingDetailsClient({ initial }: { initial: Booking & {
 
   return (
     <div className="space-y-6">
-      {/* Onglets */}
+        {artist ? (
+        <div className="text-center space-y-2 mt-4">
+          <h1 className="lg:text-3xl text-xl font-extrabold title-underline"
+        style={{ fontFamily: "var(--font-title)" }}>
+            {artist.name}
+          </h1>
+          <div className="flex justify-center items-center gap-2 text-sm text-white/70 pt-2">
+            {artist.genre && <span>{artist.genre}</span>}
+            {artist.agency && <span>• {artist.agency}</span>}
+            <span
+              className={`badge ${
+                artist.status === "confirmed"
+                  ? "badge-green"
+                  : artist.status === "pending"
+                  ? "badge-yellow"
+                  : artist.status === "canceled"
+                  ? "badge-red"
+                  : ""
+              }`}
+            >
+              {artist.status === "confirmed"
+                ? "Confirmé"
+                : artist.status === "pending"
+                ? "En discussion"
+                : artist.status === "canceled"
+                ? "Annulé"
+                : "Prospect"}
+            </span>
+          </div>
+        </div>
+      ) : (
+        <div className="text-center text-sm opacity-70">Chargement de l’artiste…</div>
+      )}
       <div className="flex gap-2">
         <button className={`btn-ghost ${tab === "timing" ? "!text-white" : ""}`} onClick={() => setTab("timing")}>
           Timing
@@ -199,130 +184,125 @@ export default function BookingDetailsClient({ initial }: { initial: Booking & {
           Artiste
         </button>
         <div className="ml-auto">
-          <Link href="/bookings/planning" className="btn-ghost">
-            Voir planning
-          </Link>
+          <Link href="/bookings/planning" className="btn-ghost">Voir planning</Link>
         </div>
       </div>
-
-      {/* TIMING */}
       {tab === "timing" && (
-        <div className="card space-y-3">
-          <div className="grid md:grid-cols-4 gap-3">
-            <select
-              className="input"
-              value={formTiming.stage}
-              onChange={(e) => setFormTiming((f) => ({ ...f, stage: e.target.value as Stage }))}
-            >
-              <option value="main">{STAGE_LABEL.main}</option>
-              <option value="second">{STAGE_LABEL.second}</option>
-              
-            </select>
+  <div className="card space-y-3">
+    <div className="grid md:grid-cols-4 gap-3">
+      <select
+        className="input"
+        value={formTiming.stage}
+        onChange={(e) => setFormTiming((f) => ({ ...f, stage: e.target.value as Stage }))}
+      >
+        <option value="main">{STAGE_LABEL.main}</option>
+        <option value="second">{STAGE_LABEL.second}</option>
+      </select>
 
-            <select
-              className="input"
-              value={formTiming.status}
-              onChange={(e) => setFormTiming((f) => ({ ...f, status: e.target.value as BookingStatus }))}
-            >
-              {BOOKING_STATUS.map((s) => (
-                <option key={s} value={s}>
-                  {BOOKING_STATUS_LABEL[s]}
-                </option>
-              ))}
-            </select>
+      <select
+        className="input"
+        value={formTiming.status}
+        onChange={(e) => setFormTiming((f) => ({ ...f, status: e.target.value as BookingStatus }))}
+      >
+        {BOOKING_STATUS.map((s) => (
+          <option key={s} value={s}>
+            {BOOKING_STATUS_LABEL[s]}
+          </option>
+        ))}
+      </select>
 
-            <input
-              className="input"
-              type="datetime-local"
-              value={formTiming.startAt}
-              onChange={(e) => setFormTiming((f) => ({ ...f, startAt: e.target.value }))}
-            />
-            <input
-              className="input"
-              type="datetime-local"
-              value={formTiming.endAt}
-              onChange={(e) => setFormTiming((f) => ({ ...f, endAt: e.target.value }))}
-            />
-          </div>
-          <div className="flex justify-end">
-            <button className="btn" onClick={saveTiming}>
-              Enregistrer
-            </button>
-          </div>
-        </div>
-      )}
+      <input
+        className="input"
+        type="datetime-local"
+        value={formTiming.startAt}
+        onChange={(e) => setFormTiming((f) => ({ ...f, startAt: e.target.value }))}
+        placeholder="Début"
+      />
+      <input
+        className="input"
+        type="datetime-local"
+        value={formTiming.endAt}
+        onChange={(e) => setFormTiming((f) => ({ ...f, endAt: e.target.value }))}
+        placeholder="Fin"
+      />
+    </div>
+    <div className="flex justify-end">
+      <button className="btn" onClick={saveTiming}>
+        Enregistrer
+      </button>
+    </div>
+  </div>
+)}
 
-      {/* LOGISTIQUE (booking) */}
+      {/* LOGISTIQUE (lecture seule depuis l’artiste) */}
       {tab === "log" && (
         <div className="card space-y-3">
-          <div className="grid md:grid-cols-2 gap-3">
-            <textarea
-              className="input h-24"
-              placeholder="Hospitality / catering / loge"
-              value={formLog.hospitalityNotes}
-              onChange={(e) => setFormLog((f) => ({ ...f, hospitalityNotes: e.target.value }))}
-            />
-            <textarea
-              className="input h-24"
-              placeholder="Tech rider"
-              value={formLog.techRider}
-              onChange={(e) => setFormLog((f) => ({ ...f, techRider: e.target.value }))}
-            />
-            <textarea
-              className="input h-24"
-              placeholder="Voyage / transport"
-              value={formLog.travelNotes}
-              onChange={(e) => setFormLog((f) => ({ ...f, travelNotes: e.target.value }))}
-            />
-            <div className="grid grid-cols-2 gap-3">
-              <input
-                className="input"
-                type="datetime-local"
-                value={formLog.pickupAt}
-                onChange={(e) => setFormLog((f) => ({ ...f, pickupAt: e.target.value }))}
-              />
-              <input
-                className="input"
-                placeholder="Lieu de récupération"
-                value={formLog.pickupLocation}
-                onChange={(e) => setFormLog((f) => ({ ...f, pickupLocation: e.target.value }))}
-              />
+          {!artist ? (
+            <div className="text-sm opacity-70">
+              {artistError ? `Erreur chargement artiste: ${artistError.message}` : "Chargement de l’artiste…"}
             </div>
-          </div>
-          <div className="flex items-center justify-end gap-2">
-            <button className="btn-ghost" onClick={importLogFromArtist}>
-              Importer depuis l’artiste
-            </button>
-            <button className="btn" onClick={saveLog}>
-              Enregistrer
-            </button>
-          </div>
+          ) : (
+            <>
+              <div className="grid md:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs opacity-70 mb-1 block">Hébergement, défrayement…</label>
+                  <div className="input min-h-24 whitespace-pre-wrap">{artist.hospitalityNotes || "—"}</div>
+                </div>
+                <div>
+                  <label className="text-xs opacity-70 mb-1 block">Personne gérant la prise en charge</label>
+                  <div className="input min-h-24 whitespace-pre-wrap">{artist.techRider || "—"}</div>
+                </div>
+                <div>
+                  <label className="text-xs opacity-70 mb-1 block">Voyage / transport</label>
+                  <div className="input min-h-24 whitespace-pre-wrap">{artist.travelNotes || "—"}</div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs opacity-70 mb-1 block">Date / heure de pickup</label>
+                    <div className="input">{artist.pickupAt ? artist.pickupAt.slice(0, 16) : "—"}</div>
+                  </div>
+                  <div>
+                    <label className="text-xs opacity-70 mb-1 block">Lieu de récupération</label>
+                    <div className="input">{artist.pickupLocation || "—"}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-xs opacity-70">
+                <span>Informations générales</span>
+                <Link href={`/artists/${artist.id}`} className="btn btn-sm">Modifier sur la fiche artiste</Link>
+              </div>
+            </>
+          )}
         </div>
       )}
 
-      {/* FINANCES (booking) */}
+      {/* FINANCES — cachet depuis l’artiste + coûts du booking */}
       {tab === "finance" && (
         <div className="space-y-4">
-          <div className="card space-y-3">
-            <div className="flex items-end gap-3">
-              <div className="flex-1">
-                <label className="text-xs opacity-70 mb-1 block">Cachet (EUR)</label>
-                <input className="input" placeholder="0,00" value={fee} onChange={(e) => setFee(e.target.value)} />
+          <div className="card space-y-2">
+            {!artist ? (
+              <div className="text-sm opacity-70">
+                {artistError ? `Erreur chargement artiste: ${artistError.message}` : "Chargement de l’artiste…"}
               </div>
-              <div className="flex items-center gap-2">
-                <button className="btn-ghost" onClick={importFinanceFromArtist}>
-                  Importer depuis l’artiste
-                </button>
-                <button className="btn" onClick={saveFee}>
-                  Enregistrer cachet
-                </button>
-              </div>
-            </div>
+            ) : (
+              <>
+                <div className="font-semibold text-lg mb-1">Cachet artiste</div>
+                <div className="text-sm opacity-80">
+                  {(artist?.feeAmount ?? 0) > 0 ? `${((artist.feeAmount ?? 0) / 100).toFixed(2)} €` : "—"}
+                </div>
+                <div className="flex justify-end">
+                  <Link href={`/artists/${artist.id}`} className="btn-ghost">Modifier sur la fiche artiste</Link>
+                </div>
+              </>
+            )}
           </div>
 
+          {/* Coûts du booking */}
           <div className="card space-y-3">
-            <div className="font-semibold">Autres coûts</div>
+            <div className="font-semibold">Autres coûts (spécifiques au booking)</div>
             <div className="grid gap-2">
+              {(costs ?? []).length === 0 && <div className="text-sm opacity-70">Aucun coût pour ce booking.</div>}
               {(costs ?? []).map((c) => (
                 <div key={c.id} className="flex items-center justify-between rounded bg-white/5 px-3 py-2">
                   <div className="text-sm">
@@ -333,89 +313,63 @@ export default function BookingDetailsClient({ initial }: { initial: Booking & {
                     <button className={`badge ${c.paid ? "badge-green" : ""}`} onClick={() => togglePaid(c)}>
                       {c.paid ? "Payé" : "À payer"}
                     </button>
-                    <button className="btn-ghost" onClick={() => delCost(c)}>
-                      Supprimer
-                    </button>
+                    <button className="btn-ghost" onClick={() => delCost(c)}>Supprimer</button>
                   </div>
                 </div>
               ))}
             </div>
 
             <div className="grid md:grid-cols-3 gap-2">
-              <input
-                className="input"
-                placeholder="Libellé"
-                value={newCost.label}
-                onChange={(e) => setNewCost((s) => ({ ...s, label: e.target.value }))}
-              />
-              <input
-                className="input"
-                placeholder="Montant (EUR)"
-                value={newCost.amount}
-                onChange={(e) => setNewCost((s) => ({ ...s, amount: e.target.value }))}
-              />
-              <button className="btn" onClick={addCost}>
-                Ajouter
-              </button>
+              <input className="input" placeholder="Libellé"
+                value={newCost.label} onChange={(e) => setNewCost((s) => ({ ...s, label: e.target.value }))} />
+              <input className="input" placeholder="Montant (EUR)"
+                value={newCost.amount} onChange={(e) => setNewCost((s) => ({ ...s, amount: e.target.value }))} />
+              <button className="btn" onClick={addCost}>Ajouter</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ARTISTE (lecture + lien vers fiche) */}
+      {/* ARTISTE — résumé */}
       {tab === "artist" && (
         <div className="space-y-4">
-          <div className="card space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="font-semibold text-lg">{artist?.name ?? "Artiste"}</div>
-              {artist && (
-                <Link className="btn-ghost" href={`/artists/${artist.id}`}>
-                  Ouvrir la fiche artiste
-                </Link>
-              )}
+          {!artist ? (
+            <div className="text-sm opacity-70">
+              {artistError ? `Erreur chargement artiste: ${artistError.message}` : "Chargement…"}
             </div>
-            <div className="text-sm opacity-80">
-              Statut: <span className="opacity-100">{artist?.status ?? "—"}</span>
-            </div>
-            <div className="text-sm opacity-80">Genre: {artist?.genre || "—"}</div>
-            <div className="text-sm opacity-80">Agence: {artist?.agency || "—"}</div>
-            <div className="text-sm opacity-80">Notes: {artist?.notes || "—"}</div>
-          </div>
-
-          <div className="card space-y-2">
-            <div className="font-semibold">Logistique (artiste)</div>
-            <div className="text-sm opacity-80">Hospitality: {artist?.hospitalityNotes || "—"}</div>
-            <div className="text-sm opacity-80">Tech rider: {artist?.techRider || "—"}</div>
-            <div className="text-sm opacity-80">Voyage: {artist?.travelNotes || "—"}</div>
-            <div className="text-sm opacity-80">
-              Pickup:{" "}
-              {artist?.pickupAt
-                ? `${new Date(artist.pickupAt).toLocaleString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    day: "2-digit",
-                    month: "2-digit",
-                  })}${artist.pickupLocation ? ` • ${artist.pickupLocation}` : ""}`
-                : artist?.pickupLocation || "—"}
-            </div>
-          </div>
-
-          <div className="card space-y-2">
-            <div className="font-semibold">Contacts (artiste)</div>
-            {(artist?.contacts ?? []).length === 0 && <div className="text-sm opacity-70">Aucun contact.</div>}
-            <div className="grid gap-2">
-              {(artist?.contacts ?? []).map((c) => (
-                <div key={c.id} className="rounded bg-white/5 px-3 py-2">
-                  <div className="text-sm font-medium">
-                    {c.name || "—"} {c.isPrimary && <span className="badge ml-2">Principal</span>}
-                  </div>
-                  <div className="text-xs opacity-80">
-                    {[c.role, c.email, c.phone].filter(Boolean).join(" • ") || "—"}
-                  </div>
+          ) : (
+            <>
+              <div className="card space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="font-semibold text-lg">{artist.name}</div>
+                  <Link className="btn-ghost" href={`/artists/${artist.id}`}>Ouvrir la fiche artiste</Link>
                 </div>
-              ))}
-            </div>
-          </div>
+                <div className="text-sm opacity-80">Statut: {artist.status}</div>
+                <div className="text-sm opacity-80">Genre: {artist.genre || "—"}</div>
+                <div className="text-sm opacity-80">Agence: {artist.agency || "—"}</div>
+                <div className="text-sm opacity-80">Notes: {artist.notes || "—"}</div>
+              </div>
+
+              <div className="card space-y-2">
+                <div className="font-semibold">Contacts</div>
+                {(artist.contacts ?? []).length === 0 && (
+                  <div className="text-sm opacity-70">Aucun contact.</div>
+                )}
+                <div className="grid gap-2">
+                  {(artist.contacts ?? []).map((c) => (
+                    <div key={c.id} className="rounded bg-white/5 px-3 py-2">
+                      <div className="text-sm font-medium">
+                        {c.name || "—"} {c.isPrimary && <span className="badge ml-2">Principal</span>}
+                      </div>
+                      <div className="text-xs opacity-80">
+                        {[c.role, c.email, c.phone].filter(Boolean).join(" • ") || "—"}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>

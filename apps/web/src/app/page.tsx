@@ -32,7 +32,7 @@ function Tile({
 
 export default async function Page() {
   const session = await auth();
-  const roles = (session?.user as any)?.roles ?? [];
+  const roles: string[] = (session?.user?.roles ?? []) as string[];
 
   const canTools = hasAnyRole(roles, SECTION_PERMS.tools);
   const canVolunteers = hasAnyRole(roles, SECTION_PERMS.volunteers);

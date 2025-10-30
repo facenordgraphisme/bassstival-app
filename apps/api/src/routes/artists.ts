@@ -153,10 +153,25 @@ router.patch("/artists/:id", validateBody(zPatchArtist), async (req, res) => {
     if ("pickupAt" in b) patch.pickupAt = b.pickupAt ?? null;
     if ("pickupLocation" in b) patch.pickupLocation = b.pickupLocation ?? null;
 
-    if (!Object.keys(patch).length) return res.json({ ok: true });
-    await db.update(artists).set(patch).where(eq(artists.id, id));
-    res.json({ ok: true });
-  } catch (e:any) { res.status(500).json({ error: e?.message || "Server error" }); }
+    if (!Object.keys(patch).length) {
+      // renvoyer la version actuelle pour rester idempotent
+      const [current] = await db.select().from(artists).where(eq(artists.id, id)).limit(1);
+      return res.json(current);
+    }
+
+    // Si votre driver supporte RETURNING (Postgres/SQLite récents)
+    const [updated] =
+      await db.update(artists).set(patch).where(eq(artists.id, id)).returning?.() ??
+      [];
+
+    if (updated) return res.json(updated);
+
+    // Sinon, refetch après update
+    const [row] = await db.select().from(artists).where(eq(artists.id, id)).limit(1);
+    return res.json(row);
+  } catch (e:any) {
+    res.status(500).json({ error: e?.message || "Server error" });
+  }
 });
 
 // ---- Coûts ARTISTE ----

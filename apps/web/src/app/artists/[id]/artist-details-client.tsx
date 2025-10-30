@@ -1,7 +1,7 @@
 // app/artists/[id]/artist-details-client.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import useSWR from "swr";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -22,12 +22,11 @@ import {
   deleteArtist,
 } from "@/lib/artists";
 import type { Booking } from "@/lib/bookings";
-import { BOOKING_STATUS_BADGE, BOOKING_STATUS_LABEL } from "@/lib/bookings";
+import { BOOKING_STATUS_BADGE, BOOKING_STATUS_LABEL, listBookings } from "@/lib/bookings";
 import { STAGE_LABEL } from "@/lib/utils-booking";
 import { confirmWithSonner } from "@/components/confirmWithSonner";
 import { useRouter } from "next/navigation";
 
-// Petit helper pour respecter no-explicit-any
 function errMsg(e: unknown): string {
   return e instanceof Error ? e.message : "Erreur";
 }
@@ -42,39 +41,50 @@ export default function ArtistDetailsClient({
   const artistId = initialArtist.id;
   const router = useRouter();
 
-  // Onglets
-  const [tab, setTab] = useState<"infos" | "contacts" | "bookings" | "log" | "finance" | "notes">("infos");
-
-  // SWR artiste
+  // ---------------- SWR ARTISTE ----------------
   const { data: artist, mutate: mutateArtist } = useSWR<ArtistWithContacts>(
     ["artist", artistId],
     () => getArtist(artistId),
-    { fallbackData: initialArtist }
+    { fallbackData: initialArtist, revalidateOnFocus: true }
   );
-  const a = artist ?? initialArtist;
 
-  // SWR bookings (aperçu)
+  const loaded = !!artist && !!artist.name && artist.name !== "Chargement…";
+  const a = loaded ? artist! : initialArtist;
+
+  // ---------------- SWR BOOKINGS ----------------
   const { data: bookings } = useSWR<Booking[]>(
     ["artist-bookings", artistId],
-    () =>
-      fetch(`${process.env.NEXT_PUBLIC_API_URL}/artists-api/bookings?artistId=${artistId}`).then((r) => r.json()),
-    { fallbackData: initialBookings }
+    () => listBookings({ artistId }),
+    { fallbackData: initialBookings, revalidateOnFocus: true }
   );
 
-  // ------ INFOS ------
-  const [formInfos, setFormInfos] = useState<{
-    name: string;
-    genre: string;
-    agency: string;
-    status: ArtistStatus;
-  }>({
+  // ---------------- ONGLET ----------------
+  const [tab, setTab] = useState<"infos" | "contacts" | "bookings" | "log" | "finance" | "notes">("infos");
+
+  // ---------------- INFOS ----------------
+  const [formInfos, setFormInfos] = useState({
     name: initialArtist.name,
     genre: initialArtist.genre ?? "",
     agency: initialArtist.agency ?? "",
     status: initialArtist.status,
   });
 
+  // Quand les VRAIES données arrivent -> on resynchronise le formulaire
+  useEffect(() => {
+    if (loaded) {
+      setFormInfos({
+        name: artist!.name,
+        genre: artist!.genre ?? "",
+        agency: artist!.agency ?? "",
+        status: artist!.status,
+      });
+    }
+  }, [loaded, artist]);
+
   const saveInfos = async () => {
+    if (!loaded) return toast.error("Données artiste non chargées.");
+    if (!formInfos.name.trim() || formInfos.name === "Chargement…") return toast.error("Nom invalide.");
+
     const t = toast.loading("Sauvegarde…");
     try {
       await updateArtist(artistId, {
@@ -84,13 +94,13 @@ export default function ArtistDetailsClient({
         status: formInfos.status,
       });
       toast.success("Infos mises à jour", { id: t });
-      mutateArtist();
-    } catch (e: unknown) {
+      await mutateArtist(); // revalidation -> met à jour a + déclenche les useEffect de sync
+    } catch (e) {
       toast.error(errMsg(e), { id: t });
     }
   };
 
-  // ------ LOGISTIQUE (niveau ARTISTE) ------
+  // ---------------- LOGISTIQUE ----------------
   const [formLog, setFormLog] = useState({
     hospitalityNotes: initialArtist.hospitalityNotes ?? "",
     techRider: initialArtist.techRider ?? "",
@@ -98,6 +108,19 @@ export default function ArtistDetailsClient({
     pickupAt: initialArtist.pickupAt ? initialArtist.pickupAt.slice(0, 16) : "",
     pickupLocation: initialArtist.pickupLocation ?? "",
   });
+
+  // Sync du bloc Logistique quand les données arrivent
+  useEffect(() => {
+    if (!loaded) return;
+    setFormLog({
+      hospitalityNotes: artist!.hospitalityNotes ?? "",
+      techRider: artist!.techRider ?? "",
+      travelNotes: artist!.travelNotes ?? "",
+      // input datetime-local attend "YYYY-MM-DDTHH:mm"
+      pickupAt: artist!.pickupAt ? artist!.pickupAt.slice(0, 16) : "",
+      pickupLocation: artist!.pickupLocation ?? "",
+    });
+  }, [loaded, artist]);
 
   const saveLog = async () => {
     const t = toast.loading("Sauvegarde…");
@@ -110,29 +133,36 @@ export default function ArtistDetailsClient({
         pickupLocation: formLog.pickupLocation || null,
       });
       toast.success("Logistique mise à jour", { id: t });
-      mutateArtist();
-    } catch (e: unknown) {
+      await mutateArtist();
+    } catch (e) {
       toast.error(errMsg(e), { id: t });
     }
   };
 
-  // ------ FINANCES (niveau ARTISTE) ------
+  // ---------------- FINANCES (cachet) ----------------
   const [fee, setFee] = useState<string>(
     typeof initialArtist.feeAmount === "number" ? (initialArtist.feeAmount / 100).toFixed(2) : ""
   );
 
+  // Sync du cachet quand les données arrivent
+  useEffect(() => {
+    if (!loaded) return;
+    setFee(typeof artist!.feeAmount === "number" ? (artist!.feeAmount / 100).toFixed(2) : "");
+  }, [loaded, artist]);
+
   const saveFee = async () => {
-    const cents = Math.round((Number(fee.replace(",", ".")) || 0) * 100);
     const t = toast.loading("Sauvegarde…");
     try {
+      const cents = Math.round((Number(fee.replace(",", ".")) || 0) * 100);
       await updateArtist(artistId, { feeAmount: cents, feeCurrency: "EUR" });
       toast.success("Cachet mis à jour", { id: t });
-      mutateArtist();
-    } catch (e: unknown) {
+      await mutateArtist();
+    } catch (e) {
       toast.error(errMsg(e), { id: t });
     }
   };
 
+  // ---------------- AUTRES COÛTS (artistCosts) ----------------
   const { data: artistCosts, mutate: mutateArtistCosts } = useSWR<ArtistCost[]>(
     ["artist-costs", artistId],
     () => listArtistCosts(artistId),
@@ -149,36 +179,43 @@ export default function ArtistDetailsClient({
       await createArtistCost(artistId, { label: newCost.label, amount: cents, currency: "EUR", paid: false });
       setNewCost({ label: "", amount: "" });
       toast.success("Coût ajouté", { id: t });
-      mutateArtistCosts();
-    } catch (e: unknown) {
+      await mutateArtistCosts();
+    } catch (e) {
       toast.error(errMsg(e), { id: t });
     }
   };
 
   const toggleArtistCostPaid = async (c: ArtistCost) => {
     await updateArtistCost(c.id, { paid: !c.paid });
-    mutateArtistCosts();
+    await mutateArtistCosts();
   };
 
   const delArtistCost = async (c: ArtistCost) => {
     await deleteArtistCost(c.id);
-    mutateArtistCosts();
+    await mutateArtistCosts();
   };
 
-  // ------ NOTES ------
+  // ---------------- NOTES ----------------
   const [notes, setNotes] = useState<string>(initialArtist.notes ?? "");
+
+  // Sync des notes quand les données arrivent
+  useEffect(() => {
+    if (!loaded) return;
+    setNotes(artist!.notes ?? "");
+  }, [loaded, artist]);
+
   const saveNotes = async () => {
     const t = toast.loading("Sauvegarde…");
     try {
       await updateArtist(artistId, { notes: notes || null });
       toast.success("Notes enregistrées", { id: t });
-      mutateArtist();
-    } catch (e: unknown) {
+      await mutateArtist();
+    } catch (e) {
       toast.error(errMsg(e), { id: t });
     }
   };
 
-  // ------ CONTACTS ------
+  // ---------------- CONTACTS ----------------
   const [newContact, setNewContact] = useState<Partial<Contact>>({
     name: "",
     role: "",
@@ -189,30 +226,30 @@ export default function ArtistDetailsClient({
 
   const addContact = async () => {
     if (!newContact.name && !newContact.email && !newContact.phone) {
-      toast.error("Renseigne au moins un nom, email ou téléphone");
-      return;
+      return toast.error("Renseigne au moins un nom, email ou téléphone");
     }
     const t = toast.loading("Ajout contact…");
     try {
       await createContact(artistId, newContact);
       toast.success("Contact ajouté", { id: t });
       setNewContact({ name: "", role: "", email: "", phone: "", isPrimary: false });
-      mutateArtist();
-    } catch (e: unknown) {
+      await mutateArtist();
+    } catch (e) {
       toast.error(errMsg(e), { id: t });
     }
   };
 
   const updateC = async (c: Contact, patch: Partial<Contact>) => {
     await updateContact(c.id, patch);
-    mutateArtist();
+    await mutateArtist();
   };
 
   const removeC = async (c: Contact) => {
     await deleteContact(c.id);
-    mutateArtist();
+    await mutateArtist();
   };
 
+  // ---------------- UI ----------------
   return (
     <div className="space-y-6">
       {/* Onglets */}
@@ -235,8 +272,12 @@ export default function ArtistDetailsClient({
         <button className={`btn-ghost ${tab === "notes" ? "!text-white" : ""}`} onClick={() => setTab("notes")}>
           Notes
         </button>
+
+        {/* Actions */}
         <div className="ml-auto flex items-center gap-2">
-          <Link className="btn-ghost" href={`/bookings?artistId=${artistId}`}>Nouveau booking</Link>
+          <Link className="btn-ghost" href={`/bookings?artistId=${artistId}`}>
+            Nouveau booking
+          </Link>
 
           <button
             className="btn-ghost text-red-400 hover:text-red-300"
@@ -247,14 +288,11 @@ export default function ArtistDetailsClient({
               );
               if (!ok) return;
 
-              await toast.promise(
-                deleteArtist(artistId),
-                {
-                  loading: "Suppression…",
-                  success: "Artiste supprimé",
-                  error: "Erreur lors de la suppression",
-                }
-              );
+              await toast.promise(deleteArtist(artistId), {
+                loading: "Suppression…",
+                success: "Artiste supprimé",
+                error: "Erreur lors de la suppression",
+              });
               router.push("/artists");
             }}
           >
@@ -479,12 +517,43 @@ export default function ArtistDetailsClient({
         </div>
       )}
 
-      {/* BOOKINGS (aperçu) */}
-      {tab === "bookings" && (
+{/* BOOKINGS (aperçu) */}
+{tab === "bookings" && (
+  <div className="space-y-3">
+    <div className="flex items-center justify-between">
+      <div className="font-semibold">
+        Bookings de {a.name}
+      </div>
+      <div className="flex gap-2">
+        <Link className="btn-ghost" href={`/bookings?artistId=${artistId}`}>
+          Voir tous les bookings
+        </Link>
+        <Link className="btn" href={`/bookings?artistId=${artistId}`}>
+          Nouveau booking
+        </Link>
+      </div>
+    </div>
+
+    {(() => {
+      // Défensif : même si l’API est censée filtrer, on refiltre côté UI
+      const mine = (bookings ?? []).filter((b) => b.artistId === artistId);
+
+      if (mine.length === 0) {
+        return (
+          <div className="text-sm opacity-70">
+            Aucun booking pour cet artiste.
+          </div>
+        );
+      }
+
+      return (
         <div className="space-y-2">
-          {(bookings ?? []).length === 0 && <div className="text-sm opacity-70">Aucun booking pour cet artiste.</div>}
-          {(bookings ?? []).map((b) => (
-            <Link key={b.id} href={`/bookings/${b.id}`} className="card neon block p-3 hover:scale-[1.01] transition">
+          {mine.map((b) => (
+            <Link
+              key={b.id}
+              href={`/bookings/${b.id}`}
+              className="card neon block p-3 hover:scale-[1.01] transition"
+            >
               <div className="flex items-center justify-between">
                 <div className="font-semibold">
                   {STAGE_LABEL[b.stage ?? "main"]} •{" "}
@@ -495,14 +564,22 @@ export default function ArtistDetailsClient({
                     month: "2-digit",
                   })}
                   {" → "}
-                  {new Date(b.endAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                  {new Date(b.endAt).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
                 </div>
-                <span className={BOOKING_STATUS_BADGE[b.status]}>{BOOKING_STATUS_LABEL[b.status]}</span>
+                <span className={BOOKING_STATUS_BADGE[b.status]}>
+                  {BOOKING_STATUS_LABEL[b.status]}
+                </span>
               </div>
             </Link>
           ))}
         </div>
-      )}
+      );
+    })()}
+  </div>
+)}
 
       {/* NOTES */}
       {tab === "notes" && (
