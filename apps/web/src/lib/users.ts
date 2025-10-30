@@ -14,12 +14,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     ...(init?.headers || {}),
   };
 
-  // ✅ Forward cookies côté serveur, sans import statique
+  // ✅ Forward cookies côté serveur, sans import statique et sans `any`
   if (isServer) {
     try {
-      const mod: { cookies: () => { toString(): string } } = await import("next/headers") as any;
-      const ck = mod?.cookies?.();
-      const cookieStr = ck?.toString?.() || "";
+      type NextHeadersModule = { cookies: () => { toString(): string } };
+      const mod = (await import("next/headers")) as unknown as NextHeadersModule;
+      const cookieStr = mod?.cookies?.().toString?.() ?? "";
       if (cookieStr) (headers as Record<string, string>).cookie = cookieStr;
     } catch {
       // noop
@@ -55,7 +55,7 @@ export function getMe() {
   return request<CurrentUser>("/users-api/me");
 }
 
-// PATCH /users-api/me  (actuellement on n'autorise que le "name")
+// PATCH /users-api/me  (actuellement on n’autorise que le "name")
 export function patchMe(patch: { name?: string }) {
   return request<{ ok: true }>("/users-api/me", {
     method: "PATCH",

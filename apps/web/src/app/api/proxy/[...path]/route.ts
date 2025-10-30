@@ -1,4 +1,5 @@
 import { auth } from "@/auth";
+import type { Session } from "next-auth";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL!; // e.g. https://your-koyeb-api
 
@@ -8,7 +9,7 @@ function passthroughHeaders(req: Request, token?: string) {
   if (ct) out.set("content-type", ct);
   out.set("accept", "application/json");
 
-  // forward browser cookies (helps auth lib that read cookies)
+  // forward browser cookies (helps auth libs that read cookies)
   const cookie = req.headers.get("cookie");
   if (cookie) out.set("cookie", cookie);
 
@@ -16,23 +17,29 @@ function passthroughHeaders(req: Request, token?: string) {
   return out;
 }
 
-async function forward(method: string, req: Request, path: string[]) {
-  const session = await auth();
+// Type utilitaire pour lire proprement des champs non-standards ajoutés à la session
+type MaybeTokens = {
+  apiToken?: string | null;
+  user?: { apiToken?: string | null } | null;
+  accessToken?: string | null; // au cas où tu l’ajoutes dans tes callbacks
+} & Partial<Session>;
 
- const token =
-  (session as any)?.apiToken ||
-  (session as any)?.user?.apiToken ||
-  (session as any)?.accessToken ||
-  undefined;
-
-if (!token) {
-  console.warn("[proxy] Missing bearer token for", path.join("/"));
-  return new Response(JSON.stringify({ error: "Missing bearer token" }), {
-    status: 401,
-    headers: { "content-type": "application/json" },
-  });
+function extractApiToken(session: Session | null): string | undefined {
+  const s = (session as unknown) as MaybeTokens | null;
+  return (s?.apiToken ?? s?.user?.apiToken ?? s?.accessToken ?? undefined) || undefined;
 }
 
+async function forward(method: string, req: Request, path: string[]) {
+  const session = await auth();
+  const token = extractApiToken(session);
+
+  if (!token) {
+    console.warn("[proxy] Missing bearer token for", path.join("/"));
+    return new Response(JSON.stringify({ error: "Missing bearer token" }), {
+      status: 401,
+      headers: { "content-type": "application/json" },
+    });
+  }
 
   const url = `${API_BASE}/${path.join("/")}`;
   const headers = passthroughHeaders(req, token);
@@ -48,7 +55,8 @@ if (!token) {
   });
 
   const respHeaders = new Headers(upstream.headers);
-  respHeaders.delete("set-cookie"); // don’t leak upstream cookies
+  // ne propage pas d'éventuels cookies de l'upstream
+  respHeaders.delete("set-cookie");
 
   return new Response(upstream.body, {
     status: upstream.status,
@@ -57,6 +65,7 @@ if (!token) {
   });
 }
 
+// Next 15: params est un Promise
 export async function GET(req: Request, ctx: { params: Promise<{ path: string[] }> }) {
   const { path } = await ctx.params;
   return forward("GET", req, path);
