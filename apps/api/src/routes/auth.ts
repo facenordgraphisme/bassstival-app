@@ -2,23 +2,15 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
 import bcrypt from "bcryptjs";
 import jwt, { type JwtPayload } from "jsonwebtoken";
+import { db } from "../drizzle/db";
+import { users } from "../drizzle/schema"; // <-- ton schema Drizzle
+import { eq } from "drizzle-orm";
+import { z } from "zod";
 
 const router = Router();
 
-/* --------------------------- Types & Store --------------------------- */
+/* --------------------------- Rôles & types --------------------------- */
 
-export type User = {
-  id: string;
-  name: string;
-  email: string;
-  passwordHash: string;
-  roles: string[]; // ["admin","staff","tools","volunteers","lineup"]
-};
-
-// ⚠️ In-memory (non persistant). Remplace par DB plus tard.
-const users: User[] = [];
-
-/** Rôles autorisés */
 const ROLES = ["admin", "staff", "tools", "volunteers", "lineup"] as const;
 type Role = (typeof ROLES)[number];
 
@@ -26,14 +18,7 @@ function isValidRoles(input: unknown): input is Role[] {
   return Array.isArray(input) && input.every((r) => (ROLES as readonly string[]).includes(r as Role));
 }
 
-/** Représentation sûre d'un user (sans hash) */
-type PublicUser = Omit<User, "passwordHash">;
-function safeUser(u: User): PublicUser {
-  const { passwordHash, ...rest } = u;
-  return rest;
-}
-
-/** Claims que l'on met dans le JWT */
+/** Claims dans le JWT */
 type AuthClaims = {
   sub: string;
   email: string;
@@ -46,51 +31,20 @@ type AuthClaims = {
 /** Request avec user injecté par requireAuth */
 type AuthedRequest = Request & { user?: AuthClaims };
 
-/* ------------------------- Helpers ------------------------ */
-
-function getUserByEmail(email?: string | null) {
-  if (!email) return undefined;
-  const norm = String(email).toLowerCase();
-  return users.find((u) => u.email.toLowerCase() === norm);
-}
-
-async function createUser(email: string, name: string, password: string, roles: Role[]) {
-  const passwordHash = await bcrypt.hash(password, 10);
-  const u: User = { id: Math.random().toString(36).slice(2), name, email, passwordHash, roles };
-  users.push(u);
-  return u;
-}
+/* ------------------------- JWT helpers ------------------------ */
 
 const JWT_SECRET =
   process.env.API_JWT_SECRET ||
   process.env.AUTH_JWT_SECRET ||
-  "dev_fallback_secret_change_me"; // évite crash en dev
+  "dev_fallback_secret_change_me";
 
 const TOKEN_TTL_HOURS = Number(
   process.env.API_TOKEN_TTL_HOURS ?? process.env.AUTH_TOKEN_TTL_HOURS ?? 12
 );
 
-/** Signe le JWT avec les champs attendus */
-function signToken(user: User) {
-  const payload: Omit<AuthClaims, "iat" | "exp"> = {
-    sub: user.id,
-    email: user.email,
-    name: user.name,
-    roles: user.roles as Role[],
-  };
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: `${TOKEN_TTL_HOURS}h` });
+function signToken(claims: Omit<AuthClaims, "iat" | "exp">) {
+  return jwt.sign(claims, JWT_SECRET, { expiresIn: `${TOKEN_TTL_HOURS}h` });
 }
-
-/* ----------------------------- Seed admin ---------------------------- */
-
-async function seedAdmin() {
-  const email = process.env.ADMIN_EMAIL;
-  const pass = process.env.ADMIN_PASSWORD;
-  if (!email || !pass) return;
-  if (getUserByEmail(email)) return; // déjà présent
-  await createUser(email, "Admin", pass, ["admin", "staff", "tools", "volunteers", "lineup"]);
-}
-seedAdmin().catch(() => {});
 
 /* --------------------------- Middlewares ----------------------------- */
 
@@ -102,14 +56,13 @@ export function requireAuth(req: AuthedRequest, res: Response, next: NextFunctio
   try {
     const decoded = jwt.verify(match[1], JWT_SECRET) as JwtPayload;
 
-    // Sécurise/normalise les champs
-    const roles: Role[] = Array.isArray(decoded.roles)
-      ? (decoded.roles.filter((r) => (ROLES as readonly string[]).includes(r as Role)) as Role[])
+    const roles: Role[] = Array.isArray((decoded as any).roles)
+      ? ((decoded as any).roles.filter((r: unknown) => (ROLES as readonly string[]).includes(r as Role)) as Role[])
       : [];
 
     const claims: AuthClaims = {
       sub: String(decoded.sub ?? ""),
-      email: String((decoded as any).email ?? ""), // `email` n'est pas standard dans JwtPayload
+      email: String((decoded as any).email ?? ""),
       name: String((decoded as any).name ?? ""),
       roles,
       iat: decoded.iat,
@@ -133,124 +86,205 @@ export function requireRoles(...allowed: Role[]) {
   };
 }
 
+/* ----------------------------- DB helpers ---------------------------- */
+
+async function getUserByEmail(email?: string | null) {
+  if (!email) return null;
+  const [row] = await db.select().from(users).where(eq(users.email, String(email))).limit(1);
+  return row ?? null;
+}
+
+async function getUserById(id: string) {
+  const [row] = await db.select().from(users).where(eq(users.id, id)).limit(1);
+  return row ?? null;
+}
+
+async function createUserInDb(params: {
+  email: string;
+  name: string;
+  password: string;
+  roles: Role[];
+}) {
+  const passwordHash = await bcrypt.hash(params.password, 10);
+  // Si ton schema a `displayName` => on alimente displayName
+  // Si c'est `name` dans ta table, remplace ci-dessous par `name: params.name`
+  await db.insert(users).values({
+    email: params.email,
+    displayName: params.name,
+    passwordHash,
+    roles: params.roles as unknown as string[], // selon ton type drizzle (text[])
+  } as any);
+  return getUserByEmail(params.email);
+}
+
+/* ----------------------------- Seed admin ---------------------------- */
+
+async function seedAdmin() {
+  const email = process.env.ADMIN_EMAIL;
+  const pass = process.env.ADMIN_PASSWORD;
+  if (!email || !pass) return;
+
+  const exist = await getUserByEmail(email);
+  if (exist) return;
+
+  await createUserInDb({
+    email,
+    name: "Admin",
+    password: pass,
+    roles: ["admin", "staff", "tools", "volunteers", "lineup"],
+  });
+}
+seedAdmin().catch(() => {});
+
 /* ------------------------------ Routes ------------------------------ */
 
 // POST /auth/login
 router.post("/login", async (req: Request, res: Response) => {
   const { email, password } = (req.body ?? {}) as { email?: string; password?: string };
+  if (!email || !password) return res.status(400).json({ error: "Missing email/password" });
 
-  const user = getUserByEmail(email);
+  const user = await getUserByEmail(email);
   if (!user) return res.status(401).json({ error: "Invalid credentials" });
 
-  const ok = await bcrypt.compare(String(password ?? ""), user.passwordHash);
+  const ok = await bcrypt.compare(String(password), (user as any).passwordHash || "");
   if (!ok) return res.status(401).json({ error: "Invalid credentials" });
 
-  const token = signToken(user);
-  return res.json({ ...safeUser(user), token });
+  const claims: Omit<AuthClaims, "iat" | "exp"> = {
+    sub: String(user.id),
+    email: String(user.email),
+    name: String((user as any).displayName ?? ""), // ou user.name si ta colonne s'appelle name
+    roles: ((user as any).roles ?? []) as Role[],
+  };
+  const token = signToken(claims);
+
+  return res.json({
+    id: user.id,
+    name: (user as any).displayName ?? null,
+    email: user.email,
+    roles: (user as any).roles ?? [],
+    token,
+  });
 });
 
 // GET /auth/me (debug)
-router.get("/me", requireAuth, (req: AuthedRequest, res: Response) => {
-  return res.json({ ok: true, user: req.user });
+router.get("/me", requireAuth, async (req: AuthedRequest, res: Response) => {
+  const u = await getUserById(String(req.user?.sub || ""));
+  if (!u) return res.status(404).json({ error: "Not found" });
+  return res.json({
+    id: u.id,
+    email: u.email,
+    name: (u as any).displayName ?? null,
+    roles: (u as any).roles ?? [],
+  });
 });
 
-// GET /auth/users
-router.get("/users", requireAuth, requireRoles("admin"), (_req: Request, res: Response) => {
-  return res.json(users.map(safeUser));
+/* ------------------------------ Admin CRUD ------------------------------ */
+
+const zCreate = z.object({
+  email: z.string().email(),
+  name: z.string().trim().min(1),
+  password: z.string().min(6),
+  roles: z.array(z.enum(ROLES)).default([]),
 });
 
-// POST /auth/users
+router.get(
+  "/users",
+  requireAuth,
+  requireRoles("admin"),
+  async (_req: Request, res: Response) => {
+    const rows = await db.select().from(users).orderBy(users.email);
+    return res.json(
+      rows.map((u) => ({
+        id: u.id,
+        email: u.email,
+        name: (u as any).displayName ?? null,
+        roles: (u as any).roles ?? [],
+      }))
+    );
+  }
+);
+
 router.post(
   "/users",
   requireAuth,
   requireRoles("admin"),
   async (req: Request, res: Response) => {
-    const { email, name, password, roles } = (req.body ?? {}) as {
-      email?: string;
-      name?: string;
-      password?: string;
-      roles?: unknown;
-    };
+    const parsed = zCreate.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: "Invalid body" });
 
-    if (!email || !password) return res.status(400).json({ error: "Missing email/password" });
-    if (getUserByEmail(email)) return res.status(409).json({ error: "Email exists" });
-    if (roles && !isValidRoles(roles)) return res.status(400).json({ error: "Invalid roles" });
+    const { email, name, password, roles } = parsed.data;
+    const exists = await getUserByEmail(email);
+    if (exists) return res.status(409).json({ error: "Email exists" });
 
-    const u = await createUser(String(email), String(name || email), String(password), (roles ?? []) as Role[]);
-    return res.status(201).json(safeUser(u));
+    const created = await createUserInDb({ email, name, password, roles });
+    return res.status(201).json({
+      id: created?.id,
+      email: created?.email,
+      name: (created as any)?.displayName ?? null,
+      roles: (created as any)?.roles ?? [],
+    });
   }
 );
 
-// PATCH /auth/users/:id
+const zPatch = z.object({
+  name: z.string().trim().min(1).optional(),
+  email: z.string().email().optional(),
+  password: z.string().min(6).optional(),
+  roles: z.array(z.enum(ROLES)).optional(),
+});
+
 router.patch(
   "/users/:id",
   requireAuth,
   requireRoles("admin"),
   async (req: Request, res: Response) => {
     const { id } = req.params;
-    const u = users.find((x) => x.id === id);
-    if (!u) return res.status(404).json({ error: "Not found" });
+    const parsed = zPatch.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: "Invalid body" });
 
-    const { name, email, password, roles } = (req.body ?? {}) as {
-      name?: string;
-      email?: string;
-      password?: string;
-      roles?: unknown;
-    };
+    const patch = parsed.data;
 
-    if (typeof name === "string") u.name = name;
-
-    if (typeof email === "string") {
-      const existing = getUserByEmail(email);
-      if (existing && existing.id !== u.id) {
+    // email unique
+    if (patch.email) {
+      const other = await getUserByEmail(patch.email);
+      if (other && String(other.id) !== id) {
         return res.status(409).json({ error: "Email exists" });
       }
-      u.email = email;
     }
 
-    if (Array.isArray(roles)) {
-      if (!isValidRoles(roles)) return res.status(400).json({ error: "Invalid roles" });
-      u.roles = roles as Role[];
+    const set: Record<string, unknown> = {};
+    if (patch.name !== undefined) set.displayName = patch.name; // adapte si ta colonne est `name`
+    if (patch.email !== undefined) set.email = patch.email;
+    if (patch.roles !== undefined) set.roles = patch.roles;
+    if (patch.password) set.passwordHash = await bcrypt.hash(patch.password, 10);
+
+    if (Object.keys(set).length === 0) {
+      return res.status(400).json({ error: "Nothing to update" });
     }
 
-    if (typeof password === "string" && password.trim()) {
-      u.passwordHash = await bcrypt.hash(password, 10);
-    }
+    await db.update(users).set(set as any).where(eq(users.id, id));
 
-    return res.json(safeUser(u));
+    const updated = await getUserById(id);
+    if (!updated) return res.status(404).json({ error: "Not found" });
+
+    return res.json({
+      id: updated.id,
+      email: updated.email,
+      name: (updated as any).displayName ?? null,
+      roles: (updated as any).roles ?? [],
+    });
   }
 );
 
-// DELETE /auth/users/:id
 router.delete(
   "/users/:id",
   requireAuth,
   requireRoles("admin"),
-  (req: Request, res: Response) => {
+  async (req: Request, res: Response) => {
     const { id } = req.params;
-    const idx = users.findIndex((x) => x.id === id);
-    if (idx === -1) return res.status(404).json({ error: "Not found" });
-    users.splice(idx, 1);
+    await db.delete(users).where(eq(users.id, id));
     return res.json({ ok: true });
   }
 );
-
-export function findUserById(id: string) {
-  return users.find((u) => u.id === id);
-}
-
-export async function updateUserDisplayName(id: string, name: string) {
-  const u = findUserById(id);
-  if (!u) throw new Error("User not found");
-  u.name = name;
-  return { id: u.id, email: u.email, name: u.name, roles: u.roles };
-}
-
-export async function changeUserPasswordInStore(id: string, newPassword: string) {
-  const u = findUserById(id);
-  if (!u) throw new Error("User not found");
-  u.passwordHash = await bcrypt.hash(newPassword, 10);
-  return true;
-}
 
 export default router;
