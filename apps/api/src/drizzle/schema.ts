@@ -1,4 +1,6 @@
 import { pgTable, uuid, text, integer, timestamp, pgEnum,uniqueIndex, boolean, numeric } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm"; 
+
 
 
 export const loanStatus = pgEnum("loan_status", ["open", "closed"]);
@@ -86,13 +88,13 @@ export const checkins = pgTable("checkins", {
   uqAssignment: uniqueIndex("uq_checkins_assignment").on(t.assignmentId), // 👈 ajouté
 }));
 
-// --- (optionnel v2) utilisateurs + rôles --- //
+// utilisateurs + rôles --- //
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
-  email: text("email").notNull(),
+  email: text("email").notNull(),                  // n’oublie pas l’unique index dans la migration
   displayName: text("display_name"),
-  role: roleEnum("role").notNull().default("staff"),
-  team: teamEnum("team"), // Ex: chef d’équipe limité à son team
+  passwordHash: text("password_hash").notNull(),   // <-- NOUVEAU
+  roles: text("roles").array().notNull().default(sql`'{}'::text[]`), // <-- NOUVEAU (array)
   createdAt: timestamp("created_at").defaultNow(),
 });
 
