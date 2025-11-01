@@ -1,19 +1,16 @@
 import { auth } from "@/auth";
 import type { Session } from "next-auth";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL!; // https://<koyeb-api>
+const API_BASE = process.env.NEXT_PUBLIC_API_URL!;
 
 function passthroughHeaders(req: Request, token?: string) {
   const out = new Headers();
-
-  // On force l'upstream à répondre en clair (pas de gzip/br)
-  out.set("accept-encoding", "identity");
   out.set("accept", "application/json");
+  out.set("accept-encoding", "identity");
 
   const ct = req.headers.get("content-type");
   if (ct) out.set("content-type", ct);
 
-  // forward cookies du navigateur (utile si l’upstream en a besoin)
   const cookie = req.headers.get("cookie");
   if (cookie) out.set("cookie", cookie);
 
@@ -21,7 +18,6 @@ function passthroughHeaders(req: Request, token?: string) {
   return out;
 }
 
-// lecture du token de façon typée
 type MaybeTokens = {
   apiToken?: string | null;
   user?: { apiToken?: string | null } | null;
@@ -29,8 +25,13 @@ type MaybeTokens = {
 } & Partial<Session>;
 
 function extractApiToken(session: Session | null): string | undefined {
-  const s = (session as unknown) as MaybeTokens | null;
-  return (s?.apiToken ?? s?.user?.apiToken ?? s?.accessToken ?? undefined) || undefined;
+  const s = session as MaybeTokens | null;
+  return (
+    s?.apiToken ||
+    s?.user?.apiToken ||
+    s?.accessToken ||
+    undefined
+  ) || undefined;
 }
 
 async function forward(method: string, req: Request, path: string[]) {
@@ -55,18 +56,15 @@ async function forward(method: string, req: Request, path: string[]) {
     method,
     headers,
     body,
-    // important: on laisse le runtime gérer, pas de compression auto
     redirect: "manual",
   });
 
-  // Nettoyage des en-têtes de l’upstream pour éviter les erreurs de décodage
   const respHeaders = new Headers(upstream.headers);
-  respHeaders.delete("set-cookie");          // ne pas propager
-  respHeaders.delete("content-encoding");    // ⚠️ clé pour ERR_CONTENT_DECODING_FAILED
-  respHeaders.delete("content-length");      // recalculé par runtime
-  respHeaders.delete("transfer-encoding");   // idem
+  respHeaders.delete("set-cookie");
+  respHeaders.delete("content-encoding");
+  respHeaders.delete("transfer-encoding");
+  respHeaders.delete("content-length");
 
-  // si pas de content-type, on en force un
   if (!respHeaders.has("content-type")) {
     respHeaders.set("content-type", "application/json; charset=utf-8");
   }
@@ -78,7 +76,6 @@ async function forward(method: string, req: Request, path: string[]) {
   });
 }
 
-// Next 15: params est un Promise
 export async function GET(req: Request, ctx: { params: Promise<{ path: string[] }> }) {
   const { path } = await ctx.params;
   return forward("GET", req, path);

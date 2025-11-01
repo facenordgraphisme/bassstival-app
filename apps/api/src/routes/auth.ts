@@ -50,8 +50,15 @@ function signToken(claims: Omit<AuthClaims, "iat" | "exp">) {
 
 export function requireAuth(req: AuthedRequest, res: Response, next: NextFunction) {
   const header = req.headers.authorization || "";
+  if (!header) {
+    console.warn("[auth] Missing Authorization header");
+    return res.status(401).json({ error: "Missing bearer token" });
+  }
   const match = header.match(/^Bearer\s+(.+)$/i);
-  if (!match) return res.status(401).json({ error: "Missing bearer token" });
+  if (!match) {
+    console.warn("[auth] Invalid Authorization format:", header);
+    return res.status(401).json({ error: "Missing bearer token" });
+  }
 
   try {
     const decoded = jwt.verify(match[1], JWT_SECRET) as JwtPayload;
