@@ -3,19 +3,10 @@
 
 @custom-variant dark (&:is(.dark *));
 
-
-
-.btn {
-  @apply inline-flex items-center gap-2 rounded-xl px-4 py-2 bg-[#ff5a5f] text-white font-medium hover:brightness-110 active:scale-95 shadow-md;
-}
-
 .card {
   @apply bg-[rgba(255,255,255,0.02)] border border-white/10 rounded-2xl p-5 backdrop-blur;
 }
 
-.input {
-  @apply w-full rounded-xl bg-black/40 border border-white/10 px-3 py-2 text-white placeholder-white/40;
-}
 
 /* Palette + fonts (v4) */
 :root {
@@ -62,29 +53,11 @@
 
 html, body { background: var(--color-bg); color: var(--color-fg); }
 
-/* Boutons, cartes, inputs */
-.btn {
-  @apply inline-flex items-center gap-2 rounded-xl px-4 py-2 font-medium hover:brightness-110 active:scale-95 shadow-md transition;
-  background: var(--color-accent);
-  color: black;
-}
-.btn-outline {
-  @apply inline-flex items-center gap-2 rounded-xl px-4 py-2 border transition;
-  border-color: rgba(255,255,255,0.2);
-  color: var(--color-fg);
-}
 .card {
   @apply border rounded-2xl p-5 backdrop-blur transition;
   background: rgba(255,255,255,0.03);
   border-color: rgba(255,255,255,0.1);
 }
-.input {
-  @apply w-full rounded-xl border px-3 py-2 transition;
-  background: rgba(0,0,0,0.4);
-  border-color: rgba(255,255,255,0.1);
-  color: var(--color-fg);
-}
-.input:focus { @apply outline-none ring-2; ring-color: rgba(255,90,95,0.4); }
 
 /* Arrière-plan déjà présent (bruit + triangles) – garde tes classes .bg-noise / .triangles */
 
@@ -131,32 +104,6 @@ html, body { background: var(--bg); color: var(--fg); }
 /* Cards / Panels */
 .card { @apply rounded-2xl p-5; }
 .card.neon { @apply shadow-lg; }
-
-/* Buttons */
-.btn { 
-  @apply inline-flex items-center gap-2 rounded-xl px-4 py-2 font-semibold transition;
-  color: black; background: var(--accent);
-}
-.btn:hover   { filter: brightness(1.1); }
-.btn:active  { transform: translateY(1px) scale(.99); }
-
-.btn-ghost {
-  @apply inline-flex items-center gap-2 rounded-xl px-4 py-2 font-medium transition border;
-  border-color: color-mix(in srgb, var(--fg) 15%, transparent);
-  color: var(--fg);
-  background: color-mix(in srgb, transparent 90%, var(--vio) 10%);
-}
-.btn-ghost:hover { border-color: color-mix(in srgb, var(--fg) 25%, transparent); }
-
-/* Inputs */
-.input {
-  @apply w-full rounded-xl px-3 py-2 transition border;
-  background: color-mix(in srgb, #05060a 80%, var(--cyan) 20%);
-  border-color: color-mix(in srgb, var(--fg) 10%, transparent);
-  color: var(--fg);
-}
-.input::placeholder { color: color-mix(in srgb, var(--fg) 45%, transparent); }
-.input:focus { outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--cyan) 35%, transparent); }
 
 /* Badges */
 .badge {
@@ -278,6 +225,65 @@ header {
   pointer-events: none; opacity: .7;
 }
 
+/* ===== Inputs unifiés (input, select, textarea, date/time) ===== */
+.input,
+select.input,
+textarea.input,
+input[type="text"].input,
+input[type="email"].input,
+input[type="tel"].input,
+input[type="number"].input,
+input[type="search"].input,
+input[type="datetime-local"].input,
+input[type="date"].input,
+input[type="time"].input {
+  @apply w-full rounded-xl px-3 py-2 transition border;
+  background: var(--field-bg);
+  border-color: var(--field-border);
+  color: var(--fg);
+}
+
+.input::placeholder { color: var(--field-placeholder); }
+
+.input:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--field-ring);
+}
+
+.input:hover {
+  border-color: color-mix(in srgb, var(--fg) 18%, transparent);
+}
+
+/* Selects: caret + remove native oddities */
+select.input {
+  background-image: none;
+}
+
+/* Disabled */
+.input:disabled {
+  opacity: .6;
+  cursor: not-allowed;
+}
+
+.input--neutral {
+  --field-bg: #0c0f14; /* sombre fixe */
+  --field-ring: color-mix(in srgb, var(--fg) 20%, transparent); /* anneau gris clair */
+}
+
+/* Erreur / invalide */
+.input--invalid {
+  --field-ring: color-mix(in srgb, #ff6b6b 50%, transparent);
+  border-color: color-mix(in srgb, #ff6b6b 35%, transparent);
+}
+
+/* Fantôme (fond ultra léger, utile dans des cartes sombres) */
+.input-ghost {
+  --field-bg: color-mix(in srgb, #0b0d12 96%, var(--accent) 4%);
+  --field-border: color-mix(in srgb, var(--fg) 8%, transparent);
+}
+/* Icône à gauche déjà gérée par .input-icon/.input-wrap */
+
+
 /* Surlignage néon pour les résultats de recherche */
 .mark-neon {
   background: color-mix(in srgb, var(--accent) 35%, transparent);
@@ -386,6 +392,30 @@ header {
   --neon-green-glow: color-mix(in srgb, var(--neon-green) 50%, transparent);
 }
 
+/* Champs (valeurs par défaut, thémables) */
+:root {
+  /* fond et bordure discrets, pas de vert forcé */
+  --field-bg: color-mix(in srgb, #0b0d12 92%, var(--accent) 8%);
+  --field-border: color-mix(in srgb, var(--fg) 10%, transparent);
+  --field-placeholder: color-mix(in srgb, var(--fg) 45%, transparent);
+  /* anneau au focus = accent du thème (violet/teal selon [data-theme]) */
+  --field-ring: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+/* Si tu veux un fond encore plus neutre (moins d’accent), dé-commente:
+:root { --field-bg: color-mix(in srgb, #0b0d12 96%, var(--accent) 4%); }
+*/
+
+/* Variantes par thème (optionnel, déjà correct par défaut) */
+/* Exemple : thème "violet" => anneau un poil plus punchy */
+[data-theme="violet"] {
+  --field-ring: color-mix(in srgb, var(--vio) 40%, transparent);
+}
+/* Exemple : thème "rose/teal" */
+[data-theme="rose"] {
+  --field-ring: color-mix(in srgb, var(--accent) 42%, transparent);
+}
+
 /* halo + fond doux pour les items returned */
 .neon-green-soft {
   background: var(--neon-green-soft);
@@ -418,4 +448,152 @@ button:disabled {
   opacity: .4;
   cursor: not-allowed;
   pointer-events: none;
+}
+
+:root {
+  --btn-radius: 0.75rem;
+
+  /* Solid (par défaut) */
+  --btn-bg: var(--accent);
+  --btn-fg: #0b0d12; /* texte sombre sur accent vif = très lisible */
+  --btn-border: color-mix(in srgb, var(--accent) 55%, transparent);
+  --btn-shadow:
+    0 10px 35px -15px rgba(0,0,0,.6),
+    0 0 22px 2px color-mix(in srgb, var(--accent) 26%, transparent);
+
+  /* Focus ring (reprend l’accent) */
+  --btn-ring: color-mix(in srgb, var(--accent) 45%, transparent);
+
+  /* Ghost / Outline */
+  --btn-ghost-fg: var(--fg);
+  --btn-ghost-border: color-mix(in srgb, var(--fg) 15%, transparent);
+  --btn-ghost-bg: color-mix(in srgb, transparent 90%, var(--vio) 10%);
+
+  --btn-outline-fg: var(--accent);
+  --btn-outline-border: color-mix(in srgb, var(--accent) 50%, transparent);
+  --btn-outline-bg: color-mix(in srgb, var(--accent) 10%, transparent);
+
+  /* Subtle / Secondary */
+  --btn-subtle-fg: var(--fg);
+  --btn-subtle-bg: color-mix(in srgb, #0b0d12 92%, var(--accent) 8%);
+  --btn-subtle-border: color-mix(in srgb, var(--fg) 10%, transparent);
+
+  /* Destructive / Success (optionnel) */
+  --btn-danger: #ff6b6b;
+  --btn-success: #27ffa8;
+}
+
+/* Variantes par thème (optionnel ; déjà bien par défaut) */
+[data-theme="violet"] {
+  --btn-ring: color-mix(in srgb, var(--vio) 55%, transparent);
+}
+[data-theme="rose"] {
+  --btn-ring: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+/* ===== Bouton de base ===== */
+.btn {
+  @apply inline-flex items-center gap-2 font-semibold transition select-none;
+  @apply px-4 py-2 rounded-xl; /* radius cohérent */
+  position: relative;
+  border: 1px solid var(--btn-border);
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  box-shadow: var(--btn-shadow);
+  will-change: transform, filter, box-shadow, background, border-color;
+}
+
+.btn:hover { filter: brightness(1.07); transform: translateY(-1px); }
+.btn:active { transform: translateY(0) scale(.99); }
+.btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--btn-ring), var(--btn-shadow); }
+
+/* Désactivé */
+.btn:disabled,
+.btn[disabled] {
+  opacity: .5;
+  pointer-events: none;
+}
+
+/* Tailles */
+.btn-sm { @apply px-3 py-1.5 text-sm rounded-lg; }
+.btn-lg { @apply px-5 py-2.5 text-base rounded-2xl; }
+
+/* Icône seule (carré) */
+.btn-icon {
+  @apply p-2 rounded-xl;
+  width: 2.5rem; height: 2.5rem;
+  display: inline-grid; place-items: center;
+}
+
+/* Full width utilitaire */
+.btn-block { @apply w-full justify-center; }
+
+/* ===== Variantes ===== */
+
+/* Ghost (fond quasi transparent, bord discret) */
+.btn-ghost {
+  @apply inline-flex items-center gap-2 font-medium transition select-none;
+  @apply px-4 py-2 rounded-xl;
+  background: var(--btn-ghost-bg);
+  color: var(--btn-ghost-fg);
+  border: 1px solid var(--btn-ghost-border);
+}
+.btn-ghost:hover { border-color: color-mix(in srgb, var(--fg) 25%, transparent); filter: brightness(1.05); }
+.btn-ghost:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--btn-ring); }
+
+/* Outline (texte accent, bord accent, léger wash au hover) */
+.btn-outline {
+  @apply inline-flex items-center gap-2 font-semibold transition select-none;
+  @apply px-4 py-2 rounded-xl;
+  color: var(--btn-outline-fg);
+  background: transparent;
+  border: 1px solid var(--btn-outline-border);
+}
+.btn-outline:hover { background: var(--btn-outline-bg); }
+.btn-outline:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--btn-ring); }
+
+/* Subtle (fond sombre doux, cohérent avec inputs) */
+.btn-subtle {
+  @apply inline-flex items-center gap-2 font-semibold transition select-none;
+  @apply px-4 py-2 rounded-xl;
+  color: var(--btn-subtle-fg);
+  background: var(--btn-subtle-bg);
+  border: 1px solid var(--btn-subtle-border);
+}
+.btn-subtle:hover { filter: brightness(1.06); }
+.btn-subtle:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--btn-ring); }
+
+/* Destructive */
+.btn-danger {
+  --btn-bg: color-mix(in srgb, var(--btn-danger) 85%, #3b0f0f 15%);
+  --btn-fg: #140606;
+  --btn-border: color-mix(in srgb, var(--btn-danger) 55%, transparent);
+  --btn-ring: color-mix(in srgb, var(--btn-danger) 50%, transparent);
+}
+
+/* Success */
+.btn-success {
+  --btn-bg: color-mix(in srgb, var(--btn-success) 85%, #0b1210 15%);
+  --btn-fg: #041c15;
+  --btn-border: color-mix(in srgb, var(--btn-success) 55%, transparent);
+  --btn-ring: color-mix(in srgb, var(--btn-success) 45%, transparent);
+}
+
+/* ===== États utilitaires ===== */
+
+/* Loading simple: rotation de l’icône svg si présente */
+.btn.is-loading svg { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg) } }
+
+/* Groupe de boutons */
+.btn-group > .btn { border-radius: 0; }
+.btn-group > .btn:first-child { border-top-left-radius: var(--btn-radius); border-bottom-left-radius: var(--btn-radius); }
+.btn-group > .btn:last-child  { border-top-right-radius: var(--btn-radius); border-bottom-right-radius: var(--btn-radius); }
+
+/* Bouton "ton sur ton" pour header, etc. */
+.btn-tonal {
+  --btn-bg: color-mix(in srgb, #0b0d12 88%, var(--accent) 12%);
+  --btn-fg: var(--fg);
+  --btn-border: color-mix(in srgb, var(--accent) 35%, transparent);
+  --btn-ring: color-mix(in srgb, var(--accent) 40%, transparent);
 }

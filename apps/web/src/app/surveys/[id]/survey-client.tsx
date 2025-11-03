@@ -244,51 +244,99 @@ export default function SurveyClient({ surveyId }: { surveyId: string }) {
       ) : (
         <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
           {candidates.map((c) => (
-            <div key={c.id} className="card neon space-y-3">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="font-semibold">{c.artist_name}</div>
-                  <div className="text-sm opacity-80">{c.genre}</div>
+            <div
+              key={c.id}
+              className="
+                group relative isolate overflow-hidden rounded-2xl
+                border border-white/10 bg-white/5 backdrop-blur-md
+                shadow-[0_10px_35px_-15px_rgba(0,0,0,.6)]
+                transition-[transform,background,border-color] duration-300 will-change-transform
+                hover:-translate-y-0.5 hover:bg-white/[0.07]
+                hover:[border-color:color-mix(in_srgb,var(--accent)_35%,transparent)]
+              "
+            >
+              {/* GLOW 1 */}
+              <div
+                aria-hidden
+                className="
+                  pointer-events-none absolute -inset-[28%] rounded-[22px] z-0
+                  opacity-0 transition-opacity duration-300
+                  group-hover:opacity-100
+                "
+                style={{
+                  background:
+                    "radial-gradient(28rem 28rem at 30% 50%, color-mix(in srgb, var(--accent) 26%, transparent), transparent 60%)",
+                }}
+              />
+              {/* GLOW 2 */}
+              <div
+                aria-hidden
+                className="
+                  pointer-events-none absolute -inset-[30%] rounded-[22px] z-0
+                  opacity-0 transition-opacity duration-300 delay-75
+                  group-hover:opacity-100
+                "
+                style={{
+                  background:
+                    "radial-gradient(26rem 26rem at 80% 50%, color-mix(in srgb, var(--vio) 18%, transparent), transparent 60%)",
+                }}
+              />
+
+              {/* CONTENU */}
+              <div className="relative z-10 p-5 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="font-semibold">{c.artist_name}</div>
+                    <div className="text-sm opacity-80">{c.genre}</div>
+                  </div>
+                  <a
+                    href={c.youtube_link}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="btn-ghost"
+                    title="Ouvrir le lien"
+                  >
+                    <ExternalLink size={16} />
+                  </a>
                 </div>
-                <a href={c.youtube_link} target="_blank" rel="noreferrer" className="btn-ghost">
-                  <ExternalLink size={16} />
-                </a>
+
+                {c.image_url ? (
+                  <div className="relative h-40 rounded-md overflow-hidden border border-white/10">
+                    <Image
+                      src={c.image_url}
+                      alt={c.artist_name}
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 768px) 100vw, 33vw"
+                      unoptimized
+                    />
+                  </div>
+                ) : (
+                  <div className="rounded-md border border-white/10 p-6 text-sm opacity-70">
+                    Aucune image
+                  </div>
+                )}
+
+                <div className="rounded-md border border-white/10 bg-white/5 p-3 text-sm flex items-center justify-between">
+                  <div className="opacity-80">Résultats</div>
+                  <div className="font-mono">
+                    Oui {c.results.yes} | Non {c.results.no} | Abst {c.results.abstain}
+                  </div>
+                </div>
+
+                {isOwner && (
+                  <div className="flex justify-end gap-2">
+                    <button className="btn-ghost" onClick={() => openEdit(c)} title="Modifier">
+                      <Pencil size={16} />
+                    </button>
+                    <button className="btn-ghost" onClick={() => del(c.id)} title="Supprimer">
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                )}
               </div>
-
-              {c.image_url ? (
-                <div className="relative h-40 rounded-md overflow-hidden border border-white/10">
-                  <Image
-                    src={c.image_url}
-                    alt={c.artist_name}
-                    fill
-                    className="object-cover"
-                    sizes="(max-width: 768px) 100vw, 33vw"
-                    unoptimized
-                  />
-                </div>
-              ) : (
-                <div className="rounded-md border border-white/10 p-6 text-sm opacity-70">Aucune image</div>
-              )}
-
-              <div className="rounded-md bg-white/5 p-3 text-sm flex items-center justify-between">
-                <div className="opacity-80">Résultats</div>
-                <div className="font-mono">
-                  Oui {c.results.yes} | Non {c.results.no} | Abst {c.results.abstain}
-                </div>
-              </div>
-
-              {/* Owner actions */}
-              {isOwner && (
-                <div className="flex justify-end gap-2">
-                  <button className="btn-ghost" onClick={() => openEdit(c)} title="Modifier">
-                    <Pencil size={16} />
-                  </button>
-                  <button className="btn-ghost" onClick={() => del(c.id)} title="Supprimer">
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              )}
             </div>
+
           ))}
         </div>
       )}

@@ -405,7 +405,7 @@ export default function VolunteersClient() {
 
       {/* Modale d’édition */}
       <Dialog open={!!editVolunteer} onOpenChange={(o) => !o && setEditVolunteer(null)}>
-        <DialogContent className="max-w-md space-y-4">
+        <DialogContent className="max-w-md space-y-4 bg-[#07070a]">
           <DialogHeader>
             <DialogTitle>Modifier le bénévole</DialogTitle>
           </DialogHeader>

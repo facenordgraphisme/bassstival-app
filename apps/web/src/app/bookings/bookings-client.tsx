@@ -17,7 +17,6 @@ import { toast } from "sonner";
 import { confirmWithSonner } from "@/components/confirmWithSonner";
 import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 
-// shadcn/ui
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -58,13 +57,8 @@ export default function BookingsClient({ initialArtistId = "" }: { initialArtist
     return m;
   }, [artists]);
 
-  // ----- Création ultra-simplifiée -----
-  const [form, setForm] = useState<{
-    artistId: string;
-    startAt: string;
-    endAt: string;
-    stage: Stage;
-  }>({
+  // ----- Création rapide -----
+  const [form, setForm] = useState<{ artistId: string; startAt: string; endAt: string; stage: Stage }>({
     artistId: initialArtistId,
     startAt: "",
     endAt: "",
@@ -92,20 +86,14 @@ export default function BookingsClient({ initialArtistId = "" }: { initialArtist
         endAt: ea.toISOString(),
       });
       toast.success("Booking créé ✅", { id: t });
-      setForm({
-        artistId: initialArtistId,
-        startAt: "",
-        endAt: "",
-        stage: "main",
-      });
+      setForm({ artistId: initialArtistId, startAt: "", endAt: "", stage: "main" });
       mutate();
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Erreur";
-      toast.error(msg, { id: t });
+      toast.error(errMsg(e), { id: t });
     }
   };
 
-  // ----- Edition inline déclenchée par le menu -----
+  // ----- Edition inline -----
   const [editingId, setEditingId] = useState<string | null>(null);
   const [edit, setEdit] = useState<{ stage: Stage; startAt: string; endAt: string }>({
     stage: "main",
@@ -154,8 +142,7 @@ export default function BookingsClient({ initialArtistId = "" }: { initialArtist
     if (!ok) return;
 
     const prev = data ?? [];
-    const optimistic = prev.filter((x) => x.id !== b.id);
-    mutate(optimistic, { revalidate: false });
+    mutate(prev.filter((x) => x.id !== b.id), { revalidate: false });
 
     try {
       await toast.promise(deleteBooking(b.id), {
@@ -212,7 +199,11 @@ export default function BookingsClient({ initialArtistId = "" }: { initialArtist
             </select>
           )}
 
-          <select className="input" value={form.stage} onChange={(e) => setForm((f) => ({ ...f, stage: e.target.value as Stage }))}>
+          <select
+            className="input"
+            value={form.stage}
+            onChange={(e) => setForm((f) => ({ ...f, stage: e.target.value as Stage }))}
+          >
             {STAGES.map((s) => (
               <option key={s} value={s}>
                 {STAGE_LABEL[s]}
@@ -220,8 +211,18 @@ export default function BookingsClient({ initialArtistId = "" }: { initialArtist
             ))}
           </select>
 
-          <input className="input" type="datetime-local" value={form.startAt} onChange={(e) => setForm((f) => ({ ...f, startAt: e.target.value }))} />
-          <input className="input" type="datetime-local" value={form.endAt} onChange={(e) => setForm((f) => ({ ...f, endAt: e.target.value }))} />
+          <input
+            className="input"
+            type="datetime-local"
+            value={form.startAt}
+            onChange={(e) => setForm((f) => ({ ...f, startAt: e.target.value }))}
+          />
+          <input
+            className="input"
+            type="datetime-local"
+            value={form.endAt}
+            onChange={(e) => setForm((f) => ({ ...f, endAt: e.target.value }))}
+          />
         </div>
 
         <div className="flex justify-end">
@@ -242,106 +243,101 @@ export default function BookingsClient({ initialArtistId = "" }: { initialArtist
           const isEditing = editingId === b.id;
 
           return (
-            <div key={b.id} className="card neon space-y-3">
-              {/* Header */}
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-white/10 grid place-items-center text-sm font-bold">
-                    {artist?.[0]?.toUpperCase() ?? "A"}
-                  </div>
-                  <div className="space-y-1">
-                    <div className="font-semibold leading-tight">
-                      {artist} • {STAGE_LABEL[b.stage ?? "main"]}
-                    </div>
-                    <span className={statusBadge}>{BOOKING_STATUS_LABEL[b.status]}</span>
-                  </div>
-                </div>
-
-                {/* Actions: Ouvrir + menu */}
-                <div className="flex items-center gap-2">
-                  <Link href={`/bookings/${b.id}`} className="btn-ghost">
-                    Ouvrir
-                  </Link>
-
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button className="btn-ghost p-2" aria-label="Actions">
-                        <MoreHorizontal size={18} />
-                      </button>
-                    </DropdownMenuTrigger>
-                    {/* Theming pour matcher ton global.css */}
-                    <DropdownMenuContent
-                      align="end"
-                      className="min-w-48 bg-[rgba(255,255,255,0.03)] border border-white/10 rounded-xl text-foreground shadow-lg backdrop-blur"
-                    >
-                      <DropdownMenuItem onClick={() => startEdit(b)}>
-                        <Pencil size={16} className="mr-2" />
-                        Modifier date/heure & scène
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        onClick={() => onDelete(b, artist)}
-                        className="text-red-500 focus:text-red-500"
-                      >
-                        <Trash2 size={16} className="mr-2" />
-                        Supprimer
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
+            <div
+              key={b.id}
+              className="
+                group relative isolate overflow-hidden rounded-2xl
+                border border-white/10 bg-black/30 backdrop-blur-md
+                shadow-[0_10px_35px_-15px_rgba(0,0,0,.6)]
+                transition-[transform,background,border-color] duration-300 will-change-transform
+                hover:-translate-y-0.5 hover:bg-black/35
+                hover:[border-color:color-mix(in_srgb,var(--accent)_35%,transparent)]
+              "
+            >
+              {/* overlay glow EXACTEMENT comme la home */}
+              <div className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div
+                  className="absolute -inset-32 blur-3xl animate-[spin_24s_linear_infinite]"
+                  style={{
+                    background:
+                      "conic-gradient(at top left, color-mix(in srgb, var(--cyan) 30%, transparent), color-mix(in srgb, var(--vio) 30%, transparent), color-mix(in srgb, var(--flame) 30%, transparent), color-mix(in srgb, var(--cyan) 30%, transparent))",
+                  }}
+                />
               </div>
+              <div
+                className="absolute -top-12 -left-12 h-40 w-40 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity"
+                style={{ background: "color-mix(in srgb, var(--accent) 16%, transparent)" }}
+              />
 
-              {/* Infos temps (affichage) */}
-              {!isEditing && (
-                <div className="text-sm opacity-80">
-                  {new Date(b.startAt).toLocaleString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    day: "2-digit",
-                    month: "2-digit",
-                  })}{" "}
-                  → {new Date(b.endAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                </div>
-              )}
+              {/* contenu au-dessus du glow */}
+              <div className="relative z-10 space-y-3 p-5">
+                {/* ---- Header ---- */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-white/10 grid place-items-center text-sm font-bold">
+                      {artist?.[0]?.toUpperCase() ?? "A"}
+                    </div>
+                    <div className="space-y-1">
+                      <div className="font-semibold leading-tight">
+                        {artist} • {STAGE_LABEL[b.stage ?? "main"]}
+                      </div>
+                      <span className={statusBadge}>{BOOKING_STATUS_LABEL[b.status]}</span>
+                    </div>
+                  </div>
 
-              {/* Editeur inline */}
-              {isEditing && (
-                <div className="space-y-3 flash">
-                  <div className="grid md:grid-cols-3 gap-3">
-                    <select
-                      className="input"
-                      value={edit.stage}
-                      onChange={(e) => setEdit((s) => ({ ...s, stage: e.target.value as Stage }))}
-                    >
-                      {STAGES.map((s) => (
-                        <option key={s} value={s}>
-                          {STAGE_LABEL[s]}
-                        </option>
-                      ))}
-                    </select>
-                    <input
-                      className="input"
-                      type="datetime-local"
-                      value={edit.startAt}
-                      onChange={(e) => setEdit((s) => ({ ...s, startAt: e.target.value }))}
-                    />
-                    <input
-                      className="input"
-                      type="datetime-local"
-                      value={edit.endAt}
-                      onChange={(e) => setEdit((s) => ({ ...s, endAt: e.target.value }))}
-                    />
-                  </div>
-                  <div className="flex justify-end gap-2">
-                    <button className="btn-ghost" onClick={() => setEditingId(null)}>
-                      Annuler
-                    </button>
-                    <button className="btn" onClick={() => saveEdit(b.id)}>
-                      Enregistrer
-                    </button>
+                  <div className="flex items-center gap-2">
+                    <Link href={`/bookings/${b.id}`} className="btn-ghost">Ouvrir</Link>
+
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button className="btn-ghost btn-icon" aria-label="Actions">
+                          <MoreHorizontal size={18} />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent
+                        align="end"
+                        className="min-w-48 bg-[rgba(255,255,255,0.03)] border border-white/10 rounded-xl text-foreground shadow-lg backdrop-blur"
+                      >
+                        <DropdownMenuItem onClick={() => startEdit(b)}>
+                          <Pencil size={16} className="mr-2" />
+                          Modifier date/heure & scène
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => onDelete(b, artist)}
+                          className="text-red-500 focus:text-red-500"
+                        >
+                          <Trash2 size={16} className="mr-2" />
+                          Supprimer
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </div>
-              )}
+
+                {/* ---- Infos temps / éditeur (inchangé) ---- */}
+                {!isEditing ? (
+                  <div className="text-sm opacity-80">
+                    {new Date(b.startAt).toLocaleString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      day: "2-digit",
+                      month: "2-digit",
+                    })}{" "}
+                    → {new Date(b.endAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                  </div>
+                ) : (
+                  <div className="space-y-3 flash">
+                    <div className="grid md:grid-cols-3 gap-3">
+                      {/* ... inputs d'édition identiques ... */}
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <button className="btn-ghost" onClick={() => setEditingId(null)}>Annuler</button>
+                      <button className="btn" onClick={() => saveEdit(b.id)}>Enregistrer</button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           );
         })}

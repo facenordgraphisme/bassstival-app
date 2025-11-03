@@ -105,97 +105,120 @@ export default function LoanClient({ id, initial }: Props) {
         </div>
       </div>
 
-      <div className="card neon space-y-4">
-        {/* Méta */}
-        <div className="text-xs sm:text-sm opacity-70 flex flex-wrap items-center gap-2">
-          <span className="truncate">
-            Ouverte le {new Date(data.openedAt).toLocaleString()}
-          </span>
-          <span
-            className={`badge ml-0 sm:ml-2 ${
-              remaining === 0 ? "badge-returned-neon" : "badge"
-            }`}
-          >
-            {remaining === 0 ? "Tout rendu ✅" : `Restant: ${remaining}`}
-          </span>
-        </div>
+      {/* Carte principale avec hover glow (cohérente avec les autres pages) */}
+      <div
+        className="
+          group relative isolate overflow-hidden rounded-2xl
+          border border-white/10 bg-white/5 backdrop-blur-md
+          shadow-[0_10px_35px_-15px_rgba(0,0,0,.6)]
+          transition-[transform,background,border-color] duration-300 will-change-transform
+          hover:-translate-y-0.5 hover:bg-white/[0.07]
+          hover:[border-color:color-mix(in_srgb,var(--accent)_35%,transparent)]
+          before:content-[''] before:absolute before:inset-0 before:-z-0
+          before:opacity-0 before:transition-opacity before:duration-300
+          before:bg-[radial-gradient(36rem_36rem_at_30%_50%,var(--accent)/26,transparent_60%)]
+          after:content-[''] after:absolute after:inset-0 after:-z-0
+          after:opacity-0 after:transition-opacity after:duration-300 after:delay-75
+          after:bg-[radial-gradient(30rem_30rem_at_80%_50%,var(--vio)/18,transparent_60%)]
+          group-hover:before:opacity-100 group-hover:after:opacity-100
+        "
+      >
+        <div className="relative z-10 p-5 space-y-4">
+          {/* Méta */}
+          <div className="text-xs sm:text-sm opacity-70 flex flex-wrap items-center gap-2">
+            <span className="truncate">
+              Ouverte le {new Date(data.openedAt).toLocaleString()}
+            </span>
+            <span
+              className={`badge ml-0 sm:ml-2 ${
+                remaining === 0 ? "badge-returned-neon" : "badge"
+              }`}
+            >
+              {remaining === 0 ? "Tout rendu ✅" : `Restant: ${remaining}`}
+            </span>
+          </div>
 
-        {/* Items */}
-        <StaggerList className="space-y-3">
-          {data.items?.map((it) => {
-            const isReturned = it.qtyIn >= it.qtyOut;
-            return (
-              <div
-                key={it.id}
-                className={`rounded border border-white/10 p-3 sm:p-3 transition-colors duration-300 ${
-                  flashId === it.id ? "flash" : ""
-                } ${isReturned ? "neon-green-soft" : ""}`}
-              >
-                <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 sm:gap-4 items-center">
-                  {/* Infos objet */}
-                  <div className="min-w-0">
-                    <div className="font-semibold truncate">{it.itemName}</div>
-                    <div
-                      className={`text-xs sm:text-sm transition-all duration-300 ${
-                        isReturned ? "text-neon-green font-semibold glow-green" : "opacity-70"
-                      }`}
-                    >
-                      {it.qtyIn}/{it.qtyOut} rendu
+          {/* Items */}
+          <StaggerList className="space-y-3">
+            {data.items?.map((it) => {
+              const isReturned = it.qtyIn >= it.qtyOut;
+              return (
+                <div
+                  key={it.id}
+                  className={`
+                    rounded border p-3 sm:p-3 transition-colors duration-300
+                    ${flashId === it.id ? "flash" : ""}
+                    ${isReturned ? "neon-green-soft" : "border-white/10 bg-black/20 hover:bg-white/[0.06] hover:[border-color:color-mix(in_srgb,var(--accent)_35%,transparent)]"}
+                  `}
+                >
+                  <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 sm:gap-4 items-center">
+                    {/* Infos objet */}
+                    <div className="min-w-0">
+                      <div className="font-semibold truncate">{it.itemName}</div>
+                      <div
+                        className={`text-xs sm:text-sm transition-all duration-300 ${
+                          isReturned
+                            ? "text-neon-green font-semibold glow-green"
+                            : "opacity-70"
+                        }`}
+                      >
+                        {it.qtyIn}/{it.qtyOut} rendu
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 sm:justify-end">
+                      {it.status !== "returned" && (
+                        <div className="flex items-center gap-2 w-full sm:w-auto">
+                          <input
+                            className="input w-full sm:w-24 !py-1.5"
+                            type="number"
+                            min={1}
+                            defaultValue={1}
+                            id={`qty-${it.id}`}
+                          />
+                          <button
+                            className="btn-outline w-full sm:w-auto !py-1.5"
+                            onClick={() => {
+                              const input = document.getElementById(
+                                `qty-${it.id}`
+                              ) as HTMLInputElement | null;
+                              const qty = Number(input?.value || 1);
+                              onReturn(it.id, qty);
+                            }}
+                          >
+                            Rendre
+                          </button>
+                        </div>
+                      )}
+
+                      <button
+                        className="btn-ghost w-full sm:w-auto !py-1.5"
+                        onClick={() => onDelete(it.id)}
+                        title="Supprimer l’objet"
+                      >
+                        <Trash2 size={16} className="mr-1 hidden sm:inline" />
+                        Suppr
+                      </button>
                     </div>
                   </div>
-
-                  {/* Actions */}
-                  <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 sm:justify-end">
-                    {it.status !== "returned" && (
-                      <div className="flex items-center gap-2 w-full sm:w-auto">
-                        <input
-                          className="input w-full sm:w-24 !py-1.5"
-                          type="number"
-                          min={1}
-                          defaultValue={1}
-                          id={`qty-${it.id}`}
-                        />
-                        <button
-                          className="btn w-full sm:w-auto !py-1.5"
-                          onClick={() => {
-                            const input = document.getElementById(
-                              `qty-${it.id}`
-                            ) as HTMLInputElement | null;
-                            const qty = Number(input?.value || 1);
-                            onReturn(it.id, qty);
-                          }}
-                        >
-                          Rendre
-                        </button>
-                      </div>
-                    )}
-
-                    <button
-                      className="btn-ghost w-full sm:w-auto !py-1.5"
-                      onClick={() => onDelete(it.id)}
-                      title="Supprimer l’objet"
-                    >
-                      <Trash2 size={16} className="mr-1 hidden sm:inline" />
-                      Suppr
-                    </button>
-                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </StaggerList>
+              );
+            })}
+          </StaggerList>
 
-        {/* Ajout d’un objet */}
-        <div className="pt-2">
-          <form action={onAdd} className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-            <input className="input w-full" name="name" placeholder="Ajouter un objet" />
-            <div className="flex gap-2 sm:gap-3">
-              <input className="input w-24" name="qty" type="number" min={1} defaultValue={1} />
-              <button className="btn w-full sm:w-auto" type="submit">
-                + Ajouter
-              </button>
-            </div>
-          </form>
+          {/* Ajout d’un objet */}
+          <div className="pt-2">
+            <form action={onAdd} className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+              <input className="input w-full" name="name" placeholder="Ajouter un objet" />
+              <div className="flex gap-2 sm:gap-3">
+                <input className="input w-24" name="qty" type="number" min={1} defaultValue={1} />
+                <button className="btn w-full sm:w-auto" type="submit">
+                  Ajouter
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       </div>
 

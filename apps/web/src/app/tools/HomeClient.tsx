@@ -84,10 +84,6 @@ export default function HomeClient({
                 <PlusCircle size={16} className="mr-1" aria-hidden />
                 Créer
               </Link>
-              <Link className="btn" href="/history">
-                <History size={16} className="mr-1" aria-hidden />
-                Historique
-              </Link>
             </div>
           </div>
 

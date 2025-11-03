@@ -11,7 +11,48 @@ import {
   type AdminUser,
   ALL_ROLES,
 } from "@/lib/admin-users";
-import { Search, Plus, Trash2, Pencil } from "lucide-react";
+import { Search, Plus, Trash2, Pencil, MoreHorizontal } from "lucide-react";
+
+/* GlowCard — même rendu que la home/volunteers/artists */
+function GlowCard({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={[
+        "group relative isolate overflow-hidden rounded-2xl",
+        "border border-white/10 bg-black/30 backdrop-blur-md",
+        "shadow-[0_10px_35px_-15px_rgba(0,0,0,.6)]",
+        "transition-[transform,background,border-color] duration-300 will-change-transform",
+        "hover:-translate-y-0.5 hover:bg-black/35",
+        "hover:[border-color:color-mix(in_srgb,var(--accent)_35%,transparent)]",
+        className,
+      ].join(" ")}
+    >
+      {/* overlay glow (conic) */}
+      <div className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div
+          className="absolute -inset-32 blur-3xl animate-[spin_24s_linear_infinite]"
+          style={{
+            background:
+              "conic-gradient(at top left, color-mix(in srgb, var(--cyan) 30%, transparent), color-mix(in srgb, var(--vio) 30%, transparent), color-mix(in srgb, var(--flame) 30%, transparent), color-mix(in srgb, var(--cyan) 30%, transparent))",
+          }}
+        />
+      </div>
+      {/* petit halo d’accent */}
+      <div
+        className="absolute -top-12 -left-12 h-40 w-40 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity"
+        style={{ background: "color-mix(in srgb, var(--accent) 16%, transparent)" }}
+      />
+      {/* contenu */}
+      <div className="relative z-10 p-5">{children}</div>
+    </div>
+  );
+}
 
 export default function AdminUsersClient() {
   const { data, mutate, isLoading } = useSWR<AdminUser[]>(
@@ -26,10 +67,7 @@ export default function AdminUsersClient() {
     if (!q.trim()) return rows;
     const s = q.toLowerCase();
     return rows.filter((u) =>
-      [u.name, u.email, (u.roles || []).join(" ")]
-        .join(" ")
-        .toLowerCase()
-        .includes(s)
+      [u.name, u.email, (u.roles || []).join(" ")].join(" ").toLowerCase().includes(s)
     );
   }, [data, q]);
 
@@ -134,24 +172,45 @@ export default function AdminUsersClient() {
       {/* Filtres + action */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="input-wrap">
-          <input className="input input-icon w-72" placeholder="Rechercher…" value={q} onChange={(e) => setQ(e.target.value)} />
-          <Search className="icon-left" size={18} />
+          <input
+            className="input input-icon w-72"
+            placeholder="Rechercher…"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+          <Search className="icon-left" size={18} aria-hidden />
         </div>
         <button className="btn" onClick={() => setShowCreate((v) => !v)}>
           <Plus size={16} className="mr-2" /> Nouvel utilisateur
         </button>
       </div>
 
-      {/* Form créer */}
+      {/* Form créer (conserve card neutre) */}
       {showCreate && (
         <div className="card space-y-3">
           <div className="grid md:grid-cols-2 gap-3">
-            <input className="input" placeholder="Nom" value={form.name} onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))} />
-            <input className="input" placeholder="Email" value={form.email} onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))} />
-            <input className="input" placeholder="Mot de passe" type="password" value={form.password} onChange={(e) => setForm(f => ({ ...f, password: e.target.value }))} />
+            <input
+              className="input"
+              placeholder="Nom"
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+            />
+            <input
+              className="input"
+              placeholder="Email"
+              value={form.email}
+              onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+            />
+            <input
+              className="input"
+              placeholder="Mot de passe"
+              type="password"
+              value={form.password}
+              onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+            />
           </div>
           <div className="flex flex-wrap gap-2">
-            {ALL_ROLES.map(r => (
+            {ALL_ROLES.map((r) => (
               <button
                 key={r}
                 type="button"
@@ -163,51 +222,85 @@ export default function AdminUsersClient() {
             ))}
           </div>
           <div className="flex justify-end gap-2">
-            <button className="btn-ghost" onClick={() => setShowCreate(false)}>Annuler</button>
-            <button className="btn" onClick={onCreate}>Créer</button>
+            <button className="btn-ghost" onClick={() => setShowCreate(false)}>
+              Annuler
+            </button>
+            <button className="btn" onClick={onCreate}>
+              Créer
+            </button>
           </div>
         </div>
       )}
 
       {/* Liste */}
       {isLoading && <div className="opacity-70 text-sm">Chargement…</div>}
-      {!isLoading && filtered.length === 0 && <div className="opacity-70 text-sm">Aucun utilisateur.</div>}
+      {!isLoading && filtered.length === 0 && (
+        <div className="opacity-70 text-sm">Aucun utilisateur.</div>
+      )}
 
       {filtered.length > 0 && (
         <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filtered.map(u => (
-            <div key={u.id} className="card neon space-y-2">
+          {filtered.map((u) => (
+            <GlowCard key={u.id} className="space-y-2">
               <div className="flex items-center justify-between">
                 <div className="font-semibold truncate">{u.name}</div>
                 <div className="flex gap-2">
-                  <button className="btn-ghost" onClick={() => openEdit(u)} title="Modifier">
+                  <button
+                    className="btn-ghost"
+                    onClick={() => openEdit(u)}
+                    title="Modifier"
+                  >
                     <Pencil size={16} />
                   </button>
-                  <button className="btn-ghost" onClick={() => onDelete(u.id)} title="Supprimer">
+                  <button
+                    className="btn-ghost"
+                    onClick={() => onDelete(u.id)}
+                    title="Supprimer"
+                  >
                     <Trash2 size={16} />
                   </button>
                 </div>
               </div>
               <div className="text-sm opacity-80 truncate">{u.email}</div>
               <div className="flex flex-wrap gap-1">
-                {(u.roles || []).map(r => <span key={r} className="badge">{r}</span>)}
+                {(u.roles || []).map((r) => (
+                  <span key={r} className="badge">
+                    {r}
+                  </span>
+                ))}
               </div>
-            </div>
+            </GlowCard>
           ))}
         </div>
       )}
 
-      {/* Edit panel */}
+      {/* Edit panel (neutre) */}
       {edit && (
         <div className="card space-y-3">
           <div className="text-lg font-bold">Modifier</div>
           <div className="grid md:grid-cols-2 gap-3">
-            <input className="input" placeholder="Nom" value={editForm.name} onChange={(e) => setEditForm(f => ({ ...f, name: e.target.value }))} />
-            <input className="input" placeholder="Email" value={editForm.email} onChange={(e) => setEditForm(f => ({ ...f, email: e.target.value }))} />
-            <input className="input" placeholder="Nouveau mot de passe (optionnel)" type="password" value={editForm.password} onChange={(e) => setEditForm(f => ({ ...f, password: e.target.value }))} />
+            <input
+              className="input"
+              placeholder="Nom"
+              value={editForm.name}
+              onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+            />
+            <input
+              className="input"
+              placeholder="Email"
+              value={editForm.email}
+              onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))}
+            />
+            <input
+              className="input"
+              placeholder="Nouveau mot de passe (optionnel)"
+              type="password"
+              value={editForm.password}
+              onChange={(e) => setEditForm((f) => ({ ...f, password: e.target.value }))}
+            />
           </div>
           <div className="flex flex-wrap gap-2">
-            {ALL_ROLES.map(r => (
+            {ALL_ROLES.map((r) => (
               <button
                 key={r}
                 type="button"
@@ -219,8 +312,12 @@ export default function AdminUsersClient() {
             ))}
           </div>
           <div className="flex justify-end gap-2">
-            <button className="btn-ghost" onClick={() => setEdit(null)}>Annuler</button>
-            <button className="btn" onClick={onSave}>Enregistrer</button>
+            <button className="btn-ghost" onClick={() => setEdit(null)}>
+              Annuler
+            </button>
+            <button className="btn" onClick={onSave}>
+              Enregistrer
+            </button>
           </div>
         </div>
       )}
