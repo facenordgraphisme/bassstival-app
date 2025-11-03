@@ -1,7 +1,3 @@
-// NE PAS exporter de valeurs runtime depuis ce fichier !
-// NE PAS importer NextAuth ici (inutile).
-// Ce fichier ne doit contenir que des "declare module".
-
 import "next-auth";
 import "next-auth/jwt";
 

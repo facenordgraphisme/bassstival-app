@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, integer, timestamp, pgEnum,uniqueIndex, boolean, numeric } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, integer, timestamp, pgEnum,uniqueIndex, boolean, numeric, primaryKey } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm"; 
 
 
@@ -168,3 +168,36 @@ export const bookingCosts = pgTable("booking_costs", {
   paid: boolean("paid").notNull().default(false),
   notes: text("notes"),
 });
+
+// --- POLLS v2 --- //
+export const pollChoice = pgEnum("poll_choice", ["yes", "no", "abstain"]);
+
+export const pollSurveys = pgTable("poll_surveys", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  title: text("title").notNull(),                 // ex: "Prospects 2026 – House/Organic"
+  description: text("description"),               // optionnel (contexte)
+  createdBy: uuid("created_by").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const pollCandidates = pgTable("poll_candidates", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  surveyId: uuid("survey_id").references(() => pollSurveys.id, { onDelete: "cascade" }).notNull(),
+  artistName: text("artist_name").notNull(),
+  genre: text("genre").notNull(),
+  youtubeLink: text("youtube_link").notNull(),
+  imageUrl: text("image_url"),
+  order: integer("order").notNull().default(0),   // tri d'affichage
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const pollVotes = pgTable("poll_votes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  candidateId: uuid("candidate_id").references(() => pollCandidates.id, { onDelete: "cascade" }).notNull(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  choice: pollChoice("choice").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => ({
+  // 1 utilisateur = 1 vote par artiste
+  uqCandidateUser: uniqueIndex("uq_pollvote_candidate_user").on(t.candidateId, t.userId),
+}));

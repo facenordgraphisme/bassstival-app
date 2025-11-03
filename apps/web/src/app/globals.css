@@ -440,3 +440,10 @@ header {
   border-color: var(--neon-green-border);
   box-shadow: 0 0 18px 2px var(--neon-green-glow);
 }
+
+
+button:disabled {
+  opacity: .4;
+  cursor: not-allowed;
+  pointer-events: none;
+}

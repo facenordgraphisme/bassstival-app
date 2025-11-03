@@ -5,7 +5,7 @@ export type AdminUser = {
   roles: string[];
 };
 
-export const ALL_ROLES = ["admin", "staff", "tools", "volunteers", "lineup"] as const;
+export const ALL_ROLES = ["admin", "staff", "tools", "volunteers", "lineup", "polls"] as const;
 
 type CreateUserInput = {
   name: string;

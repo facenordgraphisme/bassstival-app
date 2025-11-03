@@ -1,7 +1,8 @@
 // src/app/page.tsx
 import Link from "next/link";
 import { FadeUp } from "@/components/FX";
-import { ClipboardList, Users, Music3, Shield } from "lucide-react";
+import { ClipboardList, Users, Music3, Shield, Vote } from "lucide-react";
+import { CheckCircle } from "lucide-react";
 import { auth } from "@/auth";
 import { hasAnyRole, SECTION_PERMS } from "@/lib/auth-roles";
 
@@ -38,6 +39,7 @@ export default async function Page() {
   const canVolunteers = hasAnyRole(roles, SECTION_PERMS.volunteers);
   const canLineup = hasAnyRole(roles, SECTION_PERMS.lineup);
   const canAdmin = hasAnyRole(roles, SECTION_PERMS.admin);
+  const canPolls = roles.includes("polls");
 
   return (
     <FadeUp className="space-y-8">
@@ -79,6 +81,14 @@ export default async function Page() {
             title="Admin"
             desc="Gestion des utilisateurs & rôles."
             icon={<Shield size={28} aria-hidden />}
+          />
+        )}
+        {canPolls && (
+          <Tile
+            href="/surveys"
+            title="Sondages"
+            desc="Faites des propositions, votez, regardez les résultats."
+            icon={<CheckCircle size={28} aria-hidden />} // icône simple
           />
         )}
       </div>

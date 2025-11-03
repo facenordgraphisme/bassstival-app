@@ -4,6 +4,7 @@ export const ROLES = [
   "tools",       // Outils (prêts)
   "volunteers",  // Bénévoles
   "lineup",      // Artistes / bookings
+  "polls",
 ] as const;
 
 export type Role = typeof ROLES[number];

@@ -15,6 +15,7 @@ import {
   ChevronDown,
   User,
 } from "lucide-react";
+import { CheckCircle } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import Brand from "@/components/Brand";
 import { canAccess, useRoles } from "@/lib/use-permissions";
@@ -81,6 +82,7 @@ const [greetKey, setGreetKey] = useState(0);
   const canVolunteers = canAccess(roles, "volunteers");
   const canLineup = canAccess(roles, "lineup");
   const canAdmin = canAccess(roles, "admin");
+  const canPolls = roles?.includes("polls");
 
   return (
     <header className="sticky top-0 z-20 backdrop-blur bg-black/50 border-b border-white/10">
@@ -139,6 +141,11 @@ const [greetKey, setGreetKey] = useState(0);
                 {canAdmin && (
                   <NavLink href="/admin/users" icon={<Shield size={14} />}>
                     Admin
+                  </NavLink>
+                )}
+                {canPolls && (
+                  <NavLink href="/surveys" icon={<CheckCircle size={14} />}>
+                    Sondages
                   </NavLink>
                 )}
               </div>
