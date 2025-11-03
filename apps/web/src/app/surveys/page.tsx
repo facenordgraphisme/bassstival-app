@@ -21,7 +21,7 @@ export default async function SurveysPage() {
     <FadeUp className="space-y-6">
       <BackButton className="!px-2.5 !py-1.5 mt-2 mr-2" />
       <h1
-        className="text-3xl font-extrabold title-underline"
+        className="text-2xl md:text-3xl font-extrabold title-underline"
         style={{ fontFamily: "var(--font-title)" }}
       >
         Sondages

@@ -16,19 +16,11 @@ export default function HomeClient({
   initialOpen: Loan[];
   initialAll: Loan[];
 }) {
-  const [onlyOpen, setOnlyOpen] = useState(true);
+  const [onlyOpen, setOnlyOpen] = useState(false);
   const [query, setQuery] = useState("");
 
-  const { data: openData } = useSWR<Loan[]>(
-    ["loans", "open"],
-    () => listLoans("open"),
-    { fallbackData: initialOpen }
-  );
-  const { data: allData } = useSWR<Loan[]>(
-    ["loans", "all"],
-    () => listLoans(),
-    { fallbackData: initialAll }
-  );
+  const { data: openData } = useSWR<Loan[]>(["loans", "open"], () => listLoans("open"), { fallbackData: initialOpen });
+  const { data: allData } = useSWR<Loan[]>(["loans", "all"], () => listLoans(), { fallbackData: initialAll });
 
   const { data: searchOpen } = useSWR<Loan[]>(
     query.length >= 2 && onlyOpen ? ["loans", "search", query, "open"] : null,
@@ -43,98 +35,108 @@ export default function HomeClient({
 
   const dataOpenSelected = useMemo<Loan[]>(() => {
     if (query.length >= 2) {
-      return onlyOpen
-        ? (searchOpen ?? [])
-        : (searchAll ?? []).filter((l) => l.status === "open");
+      return onlyOpen ? (searchOpen ?? []) : (searchAll ?? []).filter((l) => l.status === "open");
     }
     return openData ?? [];
   }, [query.length, onlyOpen, searchOpen, searchAll, openData]);
 
   const dataAllSelected = useMemo<Loan[]>(() => {
-    if (query.length >= 2) {
-      return searchAll ?? [];
-    }
+    if (query.length >= 2) return searchAll ?? [];
     return allData ?? [];
   }, [query.length, searchAll, allData]);
 
-  const open = useMemo(
-    () => dataAllSelected.filter((l) => l.status === "open"),
-    [dataAllSelected]
-  );
-  const closed = useMemo(
-    () => dataAllSelected.filter((l) => l.status === "closed"),
-    [dataAllSelected]
-  );
+  const open = useMemo(() => dataAllSelected.filter((l) => l.status === "open"), [dataAllSelected]);
+  const closed = useMemo(() => dataAllSelected.filter((l) => l.status === "closed"), [dataAllSelected]);
 
   return (
     <>
-      {/* Header + actions + filtres */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <BackButton className="!px-2.5 !py-1.5 mt-2 mr-2" />
-          <h1
-            className="lg:text-3xl text-xl font-extrabold title-underline"
-            style={{ fontFamily: "var(--font-title)" }}
-          >
-            Outils – <br/> Fiches de prêt
-          </h1>
-        </div>
-
-        <div className="flex items-center gap-5 mt-2">
-          {/* Recherche */}
-          <div className="input-wrap">
-            <input
-              className="input input-icon w-64"
-              placeholder="Rechercher…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-            <Search className="icon-left" size={18} aria-hidden />
-            {query && (
-              <button
-                type="button"
-                onClick={() => setQuery("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 opacity-70 hover:opacity-100"
-                aria-label="Effacer la recherche"
-              >
-                <X size={16} />
-              </button>
-            )}
-          </div>
-
-          <NeonSwitch
-            size="sm"
-            checked={onlyOpen}
-            onChange={setOnlyOpen}
-            label="Uniquement en cours"
+      {/* Header + filtres dans une “carte” néon comme ailleurs */}
+      <div
+        className="relative overflow-hidden rounded-3xl border border-white/10 bg-black/40 backdrop-blur-md p-4 sm:p-6"
+      >
+        {/* glow conique très doux, piloté par le thème */}
+        <div className="pointer-events-none absolute inset-0 opacity-60">
+          <div
+            className="absolute -inset-40 blur-3xl animate-[spin_50s_linear_infinite]"
+            style={{
+              background:
+                "conic-gradient(at top left, color-mix(in srgb, var(--cyan) 20%, transparent), color-mix(in srgb, var(--vio) 20%, transparent), color-mix(in srgb, var(--flame) 16%, transparent), color-mix(in srgb, var(--cyan) 20%, transparent))",
+            }}
           />
         </div>
-      </div>
-      {/* Actions */}
-          <div className="hidden sm:flex items-center gap-2 mr-2">
-            <Link className="btn" href="/loans/new">
-              <PlusCircle size={16} className="mr-1" aria-hidden />
+
+        <div className="relative z-10 flex flex-col gap-4">
+          {/* titre + back */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <BackButton className="!px-2.5 !py-1.5" />
+              <h1
+                className="lg:text-3xl text-xl font-extrabold title-underline"
+                style={{ fontFamily: "var(--font-title)" }}
+              >
+                Outils — Fiches de prêt
+              </h1>
+            </div>
+
+            {/* Actions (desktop) */}
+            <div className="hidden sm:flex items-center gap-2">
+              <Link className="btn" href="/loans/new">
+                <PlusCircle size={16} className="mr-1" aria-hidden />
+                Créer
+              </Link>
+              <Link className="btn" href="/history">
+                <History size={16} className="mr-1" aria-hidden />
+                Historique
+              </Link>
+            </div>
+          </div>
+
+          {/* recherche + switch */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="input-wrap">
+              <input
+                className="input input-icon w-72 sm:w-80"
+                placeholder="Rechercher…"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+              <Search className="icon-left" size={18} aria-hidden />
+              {query && (
+                <button
+                  type="button"
+                  onClick={() => setQuery("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 opacity-70 hover:opacity-100"
+                  aria-label="Effacer la recherche"
+                >
+                  <X size={16} />
+                </button>
+              )}
+            </div>
+
+            <NeonSwitch
+              size="sm"
+              checked={onlyOpen}
+              onChange={setOnlyOpen}
+              /* le bool s’appelle onlyOpen → libellé explicite */
+              label="Uniquement ouvertes"
+            />
+          </div>
+
+          {/* Actions (mobile) */}
+          <div className="sm:hidden flex gap-2">
+            <Link className="btn w-full justify-center" href="/loans/new">
+              <PlusCircle size={16} className="mr-2" />
               Créer
             </Link>
-            <Link className="btn" href="/history">
-              <History size={16} className="mr-1" aria-hidden />
+            <Link className="btn w-full justify-center" href="/history">
+              <History size={16} className="mr-2" />
               Historique
             </Link>
           </div>
-      
-
-      {/* Actions visibles en mobile sous le header */}
-      <div className="sm:hidden flex gap-2">
-        <Link className="btn w-full justify-center" href="/loans/new">
-          <PlusCircle size={16} className="mr-2" />
-          Créer
-        </Link>
-        <Link className="btn w-full justify-center" href="/history">
-          <History size={16} className="mr-2" />
-          Historique
-        </Link>
+        </div>
       </div>
 
+      {/* Liste / grilles */}
       {onlyOpen ? (
         dataOpenSelected.length === 0 ? (
           <div className="text-sm opacity-70 mt-2">Aucun résultat.</div>

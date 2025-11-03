@@ -99,7 +99,7 @@ const [greetKey, setGreetKey] = useState(0);
         <div className="hidden md:flex items-center gap-3">
           {canRoot && (
             <NavLink href="/" icon={<LayoutDashboard size={16} />}>
-              Dashboard
+              Accueil
             </NavLink>
           )}
           {canRoot && (
@@ -210,48 +210,84 @@ const [greetKey, setGreetKey] = useState(0);
 
       {/* Mobile menu */}
       {open && (
-        <div className="md:hidden border-t border-white/10 bg-black/60 p-3 space-y-2">
-          {/* ... tes liens ... */}
-         {status === "authenticated" && (
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.div
-              key={`m-${session?.user?.name || session?.user?.email}`}
-              initial={{ opacity: 0, y: -6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.25, ease: "easeOut" }}
-              className="text-sm text-white/80"
-            >
+        <div className="md:hidden border-t border-white/10 bg-black/60 p-3 space-y-3">
+          {/* Greeting */}
+          {status === "authenticated" && (
+            <div className="text-sm text-white/80">
               Bienvenue{" "}
               <span className="font-semibold">
                 {session?.user?.name || session?.user?.email?.split("@")[0]}
               </span>{" "}
-              <motion.span
-                aria-hidden
-                initial={{ rotate: 0 }}
-                animate={{ rotate: [0, 18, -8, 14, -4, 0] }}
-                transition={{ duration: 0.8, delay: 0.1, ease: "easeOut" }}
-                className="inline-block"
-              >
-                👋
-              </motion.span>
-            </motion.div>
-          </AnimatePresence>
-        )}
+              👋
+            </div>
+          )}
+
+          {/* Liens principaux */}
+          <div className="flex flex-col">
+            {canRoot && (
+              <NavLink href="/" icon={<LayoutDashboard size={16} />} onClick={() => setOpen(false)}>
+                Accueil
+              </NavLink>
+            )}
+            {canRoot && (
+              <NavLink href="/profile" icon={<User size={16} />} onClick={() => setOpen(false)}>
+                Profil
+              </NavLink>
+            )}
+          </div>
+
+          {/* Sections (affichées directement en mobile, pas de dropdown) */}
+          <div className="pt-2 border-t border-white/10">
+            <div className="text-xs uppercase tracking-wide opacity-60 mb-1">Sections</div>
+            <div className="flex flex-col">
+              {canTools && (
+                <NavLink href="/tools" icon={<ClipboardList size={14} />} onClick={() => setOpen(false)}>
+                  Outils
+                </NavLink>
+              )}
+              {canVolunteers && (
+                <NavLink href="/volunteers" icon={<Users size={14} />} onClick={() => setOpen(false)}>
+                  Bénévoles
+                </NavLink>
+              )}
+              {canLineup && (
+                <NavLink href="/lineup" icon={<Music3 size={14} />} onClick={() => setOpen(false)}>
+                  Line Up
+                </NavLink>
+              )}
+              {canAdmin && (
+                <NavLink href="/admin/users" icon={<Shield size={14} />} onClick={() => setOpen(false)}>
+                  Admin
+                </NavLink>
+              )}
+              {canPolls && (
+                <NavLink href="/surveys" icon={<CheckCircle size={14} />} onClick={() => setOpen(false)}>
+                  Sondages
+                </NavLink>
+              )}
+            </div>
+          </div>
+
+          {/* Theme toggle */}
+          <div className="pt-2 border-t border-white/10">
+            <ThemeToggle />
+          </div>
 
           {/* Auth actions */}
-          {status === "authenticated" ? (
-            <button
-              className="btn-ghost w-full"
-              onClick={() => signOut({ callbackUrl: "/login" })}
-            >
-              Déconnexion
-            </button>
-          ) : (
-            <button className="btn-ghost w-full" onClick={() => signIn()}>
-              Se connecter
-            </button>
-          )}
+          <div className="pt-2 border-t border-white/10">
+            {status === "authenticated" ? (
+              <button
+                className="btn-ghost w-full"
+                onClick={() => signOut({ callbackUrl: "/login" })}
+              >
+                Déconnexion
+              </button>
+            ) : (
+              <button className="btn-ghost w-full" onClick={() => signIn()}>
+                Se connecter
+              </button>
+            )}
+          </div>
         </div>
       )}
     </header>

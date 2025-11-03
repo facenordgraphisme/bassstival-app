@@ -3,45 +3,7 @@
 
 @custom-variant dark (&:is(.dark *));
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-}
+
 
 .btn {
   @apply inline-flex items-center gap-2 rounded-xl px-4 py-2 bg-[#ff5a5f] text-white font-medium hover:brightness-110 active:scale-95 shadow-md;
@@ -260,19 +222,26 @@ header {
 }
 
 :root {
-  --background: #0a0a0a;
-  --foreground: #ededed;
-  --cyan: #00fff7;
-  --accent: #38a9bd; /* par défaut : rose néon */
-  --muted: #888;
+  --accent: #38a9bd;   /* bleu-vert par défaut */
+  --vio:    #7a5cff;   /* violet */
+  --cyan:   #34d8ff;   /* cyan */
+  --flame:  #ff7a1a;   /* orange/ambre pour les highlights */
 }
 
+/* Thème VIOLET : accent violet, cyan en secondaire */
 [data-theme="violet"] {
-  --accent: #9d4edd; /* violet néon */
+  --accent: #9d4edd;   /* accent principal */
+  --vio:    #9d4edd;
+  --cyan:   #34d8ff;
+  --flame:  #ff7a1a;
 }
 
+/* Thème BLEU-VERT (ancien "rose" dans ton toggle) : accent cyan/teal, violet en secondaire */
 [data-theme="rose"] {
-  --accent: #38a9bd; /* rose néon */
+  --accent: #12d6df;     /* TEAL/CYAN néon (accent principal) */
+  --vio:    #3a7bd5;     /* BLEU électrique (secondaire)      */
+  --cyan:   #1ef7b5;     /* VERT-TEAL néon (punch/contraste)  */
+  --flame:  #ff7a1a;     /* ambre pour les highlights          */
 }
 
 /* Neon toggle switch */
@@ -353,11 +322,14 @@ header {
 }
 
 @layer base {
-  * {
-    @apply border-border outline-ring/50;
+  *, ::before, ::after {
+    /* use your existing CSS vars instead of Tailwind tokens */
+    border-color: var(--border);
+    outline-color: color-mix(in srgb, var(--ring) 50%, transparent);
   }
   body {
-    @apply bg-background text-foreground;
+    background: var(--background);
+    color: var(--foreground);
   }
 }
 

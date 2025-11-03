@@ -143,32 +143,60 @@ export default function SurveyClient({ surveyId }: { surveyId: string }) {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <BackButton className="!px-2.5 !py-1.5 mt-2 mr-2" />
-          <h1 className="text-3xl font-extrabold title-underline" style={{ fontFamily: "var(--font-title)" }}>
-            {data.title}
-          </h1>
-          {data.description && <p className="opacity-80 mt-1 pt-4">{data.description}</p>}
-        </div>
-        <button
-          className="btn"
-          onClick={() => {
-            if (candidates.length === 0) {
-              toast.info(isOwner ? "Ajoute d’abord des artistes au sondage" : "Aucun artiste dans ce sondage");
-              return;
-            }
-            setI(0);
-            setOpen(true);
-          }}
-        >
-          Ouvrir le sondage
-        </button>
-        <button className="btn-ghost" onClick={() => setShowVoters((v) => !v)}>
-          {showVoters ? "Masquer les détails" : "Voir détails des votes"}
-        </button>
-      </div>
+        {/* Header */}
+        <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
+            {/* Bloc gauche : titre + description */}
+            <div className="w-full sm:w-auto">
+                {/* Ligne titre + retour + badge */}
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                <BackButton className="!px-2.5 !py-1.5" />
+                <h1
+                    className="text-2xl md:text-3xl font-extrabold leading-tight break-words whitespace-normal title-underline"
+                    style={{ fontFamily: "var(--font-title)" }}
+                >
+                    {data.title}
+                </h1>
+                <span className="rounded-full border border-white/10 px-2 py-0.5 text-xs md:text-sm opacity-80">
+                    {candidates.length} champ{candidates.length > 1 ? "s" : ""}
+                </span>
+                </div>
+
+                {/* Description */}
+                {data.description && (
+                <p className="opacity-80 text-sm md:text-base leading-relaxed mt-3 pl-10 sm:pl-[3.2rem] max-w-2xl">
+                    {data.description}
+                </p>
+                )}
+            </div>
+
+            {/* Bloc droit : actions */}
+            <div className="flex flex-wrap gap-2 sm:flex-nowrap sm:justify-end w-full sm:w-auto sm:pt-1">
+                <button
+                className="btn w-full sm:w-auto"
+                onClick={() => {
+                    if (candidates.length === 0) {
+                    toast.info(
+                        isOwner
+                        ? "Ajoute d’abord des artistes au sondage"
+                        : "Aucun artiste dans ce sondage"
+                    );
+                    return;
+                    }
+                    setI(0);
+                    setOpen(true);
+                }}
+                >
+                Ouvrir le sondage
+                </button>
+
+                <button
+                className="btn-ghost w-full sm:w-auto"
+                onClick={() => setShowVoters((v) => !v)}
+                >
+                {showVoters ? "Masquer les détails" : "Voir détails des votes"}
+                </button>
+            </div>
+            </div>
 
       {/* Owner: add form */}
       {isOwner && (
@@ -189,7 +217,7 @@ export default function SurveyClient({ surveyId }: { surveyId: string }) {
             />
             <input
               className="input"
-              placeholder="Lien YouTube (chaîne)"
+              placeholder="Lien YouTube ou autre"
               value={createForm.youtube_link}
               onChange={(e) => setCreateForm((f) => ({ ...f, youtube_link: e.target.value }))}
             />

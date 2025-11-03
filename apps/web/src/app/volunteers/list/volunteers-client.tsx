@@ -9,7 +9,6 @@ import {
   deleteVolunteer,
   updateVolunteer,
   type Volunteer,
-  // type Team,
 } from "@/lib/volunteers";
 import { Team, TEAM_KEYS, TEAM_LABEL } from "@/lib/teams";
 
@@ -20,10 +19,39 @@ import BackButton from "@/components/BackButton";
 
 const TEAMS: Team[] = ["bar", "billetterie", "parking", "bassspatrouille", "tech", "autre"];
 
+/* ---------- helpers ---------- */
 function errMsg(e: unknown): string {
   return e instanceof Error ? e.message : "Erreur";
 }
 
+/** classes communes pour une tuile cohérente avec le reste du site */
+const tileBase =
+  "group relative overflow-hidden isolate rounded-2xl border border-white/10 bg-white/5 " +
+  "backdrop-blur-md shadow-[0_10px_35px_-15px_rgba(0,0,0,.6)] " +
+  "transition-[transform,box-shadow,border-color,background] duration-300 will-change-transform " +
+  "hover:scale-[1.015] hover:bg-white/[0.07] " +
+  "hover:[border-color:color-mix(in_srgb,var(--accent)_35%,transparent)] " +
+  "focus-within:ring-2 focus-within:ring-[var(--accent)]/40 p-4 sm:p-5";
+
+/** halo + ring décoratifs (au survol) */
+function TileDecor({ ring = "ring-[color-mix(in_srgb,var(--vio)_20%,transparent)]" }: { ring?: string }) {
+  return (
+    <>
+      <span aria-hidden className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity">
+        <span
+          className="absolute -inset-32 blur-3xl animate-[spin_24s_linear_infinite]"
+          style={{
+            background:
+              "conic-gradient(at top left, color-mix(in srgb, var(--cyan) 28%, transparent), color-mix(in srgb, var(--vio) 28%, transparent), color-mix(in srgb, var(--flame) 22%, transparent), color-mix(in srgb, var(--cyan) 28%, transparent))",
+          }}
+        />
+      </span>
+      <div aria-hidden className={`absolute inset-0 rounded-2xl ring-1 ring-inset opacity-40 pointer-events-none ${ring} group-hover:opacity-60`} />
+    </>
+  );
+}
+
+/* ---------- component ---------- */
 export default function VolunteersClient() {
   const [q, setQ] = useState("");
   const [team, setTeam] = useState<Team | "">("");
@@ -145,15 +173,13 @@ export default function VolunteersClient() {
 
   return (
     <FadeUp className="space-y-8">
-          <div className="flex items-center gap-3">
-            <BackButton className="!px-2.5 !py-1.5 mt-2 mr-2" />
-              <h1
-                className="text-3xl font-extrabold title-underline"
-                style={{ fontFamily: "var(--font-title)" }}
-              >
-            Liste des bénévoles
-            </h1>
-          </div>
+      <div className="flex items-center gap-3">
+        <BackButton className="!px-2.5 !py-1.5 mt-2 mr-2" />
+        <h1 className="text-3xl font-extrabold title-underline" style={{ fontFamily: "var(--font-title)" }}>
+          Liste des bénévoles
+        </h1>
+      </div>
+
       {/* Filtres */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="flex flex-col sm:flex-row gap-3">
@@ -167,14 +193,12 @@ export default function VolunteersClient() {
             <Search className="icon-left" size={18} aria-hidden />
           </div>
 
-          <select
-            className="input"
-            value={team}
-            onChange={(e) => setTeam(e.target.value as Team | "")}
-          >
+          <select className="input" value={team} onChange={(e) => setTeam(e.target.value as Team | "")}>
             <option value="">Toutes équipes</option>
             {TEAM_KEYS.map((t) => (
-              <option key={t} value={t}>{TEAM_LABEL[t]}</option>
+              <option key={t} value={t}>
+                {TEAM_LABEL[t]}
+              </option>
             ))}
           </select>
 
@@ -184,7 +208,13 @@ export default function VolunteersClient() {
           </select>
 
           {(q || team) && (
-            <button className="btn-ghost" onClick={() => { setQ(""); setTeam(""); }}>
+            <button
+              className="btn-ghost"
+              onClick={() => {
+                setQ("");
+                setTeam("");
+              }}
+            >
               Réinitialiser
             </button>
           )}
@@ -199,25 +229,56 @@ export default function VolunteersClient() {
       {showForm && (
         <div className="card space-y-3">
           <div className="grid md:grid-cols-2 gap-3">
-            <input className="input" placeholder="Prénom" value={form.firstName}
-              onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))} />
-            <input className="input" placeholder="Nom" value={form.lastName}
-              onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))} />
-            <input className="input" placeholder="Téléphone" value={form.phone}
-              onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
-            <input className="input" placeholder="Email" value={form.email}
-              onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
-            <select className="input" value={form.team}
-              onChange={(e) => setForm((f) => ({ ...f, team: e.target.value as Team }))}>
+            <input
+              className="input"
+              placeholder="Prénom"
+              value={form.firstName}
+              onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))}
+            />
+            <input
+              className="input"
+              placeholder="Nom"
+              value={form.lastName}
+              onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))}
+            />
+            <input
+              className="input"
+              placeholder="Téléphone"
+              value={form.phone}
+              onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+            />
+            <input
+              className="input"
+              placeholder="Email"
+              value={form.email}
+              onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+            />
+            <select
+              className="input"
+              value={form.team}
+              onChange={(e) => setForm((f) => ({ ...f, team: e.target.value as Team }))}
+            >
               <option value="">— Équipe —</option>
-              {TEAM_KEYS.map((t) => <option key={t} value={t}>{TEAM_LABEL[t]}</option>)}
+              {TEAM_KEYS.map((t) => (
+                <option key={t} value={t}>
+                  {TEAM_LABEL[t]}
+                </option>
+              ))}
             </select>
-            <input className="input" placeholder="Notes" value={form.notes}
-              onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} />
+            <input
+              className="input"
+              placeholder="Notes"
+              value={form.notes}
+              onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+            />
           </div>
           <div className="flex justify-end gap-2">
-            <button className="btn-ghost" onClick={() => setShowForm(false)}>Annuler</button>
-            <button className="btn" onClick={onCreate}>Créer</button>
+            <button className="btn-ghost" onClick={() => setShowForm(false)}>
+              Annuler
+            </button>
+            <button className="btn" onClick={onCreate}>
+              Créer
+            </button>
           </div>
         </div>
       )}
@@ -235,23 +296,34 @@ export default function VolunteersClient() {
                 <h2 className="text-xl font-bold capitalize">{t}</h2>
                 <span className="badge">{items.length}</span>
               </div>
+
               <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
                 {items.map((v) => (
-                  <div key={v.id} className="card neon space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="font-semibold">{v.firstName} {v.lastName}</div>
-                      <div className="flex gap-2">
-                        <button className="btn-ghost" onClick={() => openEdit(v)} title="Modifier">
-                          <Pencil size={16} />
-                        </button>
-                        <button className="btn-ghost" onClick={() => onDelete(v.id)} title="Supprimer">
-                          <Trash2 size={16} />
-                        </button>
+                  <div key={v.id} className={tileBase}>
+                    <TileDecor />
+
+                    <div className="relative z-10 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="font-semibold truncate">
+                          {v.firstName} {v.lastName}
+                        </div>
+                        <div className="flex gap-2">
+                          <button className="btn-ghost" onClick={() => openEdit(v)} title="Modifier">
+                            <Pencil size={16} />
+                          </button>
+                          <button className="btn-ghost" onClick={() => onDelete(v.id)} title="Supprimer">
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
                       </div>
+
+                      <div className="text-xs opacity-70">
+                        Équipe : <span className="font-medium">{TEAM_LABEL[v.team]}</span>
+                      </div>
+                      <div className="text-sm opacity-80 truncate">Email: {v.email || "—"}</div>
+                      <div className="text-sm opacity-80 truncate">Téléphone: {v.phone || "—"}</div>
+                      {v.notes && <div className="text-xs opacity-70">{v.notes}</div>}
                     </div>
-                    <div className="text-sm opacity-80">Email: {v.email || "—"}</div>
-                    <div className="text-sm opacity-80">Téléphone: {v.phone || "—"}</div>
-                    {v.notes && <div className="text-xs opacity-70">{v.notes}</div>}
                   </div>
                 ))}
               </div>
@@ -260,78 +332,76 @@ export default function VolunteersClient() {
         </div>
       )}
 
-      {/* Vue non groupée (recherche ou filtre d’équipe actifs) */}
-{!showGrouped && (
-  <>
-    {/* Titre dynamique */}
-    {(team || q) && (
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-3">
-          <h2 className="text-xl font-bold capitalize">
-            {team
-              ? `Équipe : ${TEAM_LABEL[team as Team]}`
-              : "Résultats de la recherche"}
-          </h2>
-          {rows.length > 0 && <span className="badge">{rows.length}</span>}
-        </div>
-
-        <button
-          className="group flex items-center gap-2 rounded-full border border-yellow-500/50 bg-black/40 px-3 py-2 text-sm font-semibold text-yellow-400 transition-all hover:text-yellow-100 hover:border-yellow-400"
-          onClick={() => {
-            setTeam("");
-            setQ("");
-          }}
-        >
-          ← Retour à toutes les équipes
-        </button>
-      </div>
-    )}
-
-    {/* État vide */}
-    {!isLoading && rows.length === 0 && (
-      <div className="text-sm opacity-70">
-        Aucun bénévole {team ? `pour ${TEAM_LABEL[team as Team]}` : "correspondant à la recherche"}.
-      </div>
-    )}
-
-    {/* Grille des bénévoles filtrés */}
-    {rows.length > 0 && (
-      <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {[...rows]
-          .sort((a, b) => {
-            const an = `${a.lastName} ${a.firstName}`.toLowerCase();
-            const bn = `${b.lastName} ${b.firstName}`.toLowerCase();
-            return order === "asc" ? an.localeCompare(bn) : bn.localeCompare(an);
-          })
-          .map((v) => (
-            <div key={v.id} className="card neon space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="font-semibold">
-                  {v.firstName} {v.lastName}
-                </div>
-                <div className="flex gap-2">
-                  <button className="btn-ghost" onClick={() => openEdit(v)} title="Modifier">
-                    <Pencil size={16} />
-                  </button>
-                  <button className="btn-ghost" onClick={() => onDelete(v.id)} title="Supprimer">
-                    <Trash2 size={16} />
-                  </button>
-                </div>
+      {/* Vue non groupée (recherche / filtre actifs) */}
+      {!showGrouped && (
+        <>
+          {(team || q) && (
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-3">
+                <h2 className="text-xl font-bold capitalize">
+                  {team ? `Équipe : ${TEAM_LABEL[team as Team]}` : "Résultats de la recherche"}
+                </h2>
+                {rows.length > 0 && <span className="badge">{rows.length}</span>}
               </div>
 
-              <div className="text-xs opacity-70">
-                Équipe : <span className="font-medium">{TEAM_LABEL[v.team]}</span>
-              </div>
-              <div className="text-sm opacity-80">Email: {v.email || "—"}</div>
-              <div className="text-sm opacity-80">Téléphone: {v.phone || "—"}</div>
-              {v.notes && <div className="text-xs opacity-70">{v.notes}</div>}
+              <button
+                className="group flex items-center gap-2 rounded-full border border-yellow-500/50 bg-black/40 px-3 py-2 text-sm font-semibold text-yellow-400 transition-all hover:text-yellow-100 hover:border-yellow-400"
+                onClick={() => {
+                  setTeam("");
+                  setQ("");
+                }}
+              >
+                ← Retour à toutes les équipes
+              </button>
             </div>
-          ))}
-      </div>
-    )}
-  </>
-)}
+          )}
 
+          {!isLoading && rows.length === 0 && (
+            <div className="text-sm opacity-70">
+              Aucun bénévole {team ? `pour ${TEAM_LABEL[team as Team]}` : "correspondant à la recherche"}.
+            </div>
+          )}
+
+          {rows.length > 0 && (
+            <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {[...rows]
+                .sort((a, b) => {
+                  const an = `${a.lastName} ${a.firstName}`.toLowerCase();
+                  const bn = `${b.lastName} ${b.firstName}`.toLowerCase();
+                  return order === "asc" ? an.localeCompare(bn) : bn.localeCompare(an);
+                })
+                .map((v) => (
+                  <div key={v.id} className={tileBase}>
+                    <TileDecor />
+
+                    <div className="relative z-10 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="font-semibold truncate">
+                          {v.firstName} {v.lastName}
+                        </div>
+                        <div className="flex gap-2">
+                          <button className="btn-ghost" onClick={() => openEdit(v)} title="Modifier">
+                            <Pencil size={16} />
+                          </button>
+                          <button className="btn-ghost" onClick={() => onDelete(v.id)} title="Supprimer">
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="text-xs opacity-70">
+                        Équipe : <span className="font-medium">{TEAM_LABEL[v.team]}</span>
+                      </div>
+                      <div className="text-sm opacity-80 truncate">Email: {v.email || "—"}</div>
+                      <div className="text-sm opacity-80 truncate">Téléphone: {v.phone || "—"}</div>
+                      {v.notes && <div className="text-xs opacity-70">{v.notes}</div>}
+                    </div>
+                  </div>
+                ))}
+            </div>
+          )}
+        </>
+      )}
 
       {/* Modale d’édition */}
       <Dialog open={!!editVolunteer} onOpenChange={(o) => !o && setEditVolunteer(null)}>
@@ -343,25 +413,56 @@ export default function VolunteersClient() {
           {editVolunteer && (
             <>
               <div className="grid gap-2">
-                <input className="input" placeholder="Prénom" value={editForm.firstName}
-                  onChange={(e) => setEditForm((f) => ({ ...f, firstName: e.target.value }))} />
-                <input className="input" placeholder="Nom" value={editForm.lastName}
-                  onChange={(e) => setEditForm((f) => ({ ...f, lastName: e.target.value }))} />
-                <input className="input" placeholder="Téléphone" value={editForm.phone}
-                  onChange={(e) => setEditForm((f) => ({ ...f, phone: e.target.value }))} />
-                <input className="input" placeholder="Email" value={editForm.email}
-                  onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))} />
-                <select className="input" value={editForm.team}
-                  onChange={(e) => setEditForm((f) => ({ ...f, team: e.target.value as Team }))}>
-                  {TEAM_KEYS.map((t) => <option key={t} value={t}>{TEAM_LABEL[t]}</option>)}
+                <input
+                  className="input"
+                  placeholder="Prénom"
+                  value={editForm.firstName}
+                  onChange={(e) => setEditForm((f) => ({ ...f, firstName: e.target.value }))}
+                />
+                <input
+                  className="input"
+                  placeholder="Nom"
+                  value={editForm.lastName}
+                  onChange={(e) => setEditForm((f) => ({ ...f, lastName: e.target.value }))}
+                />
+                <input
+                  className="input"
+                  placeholder="Téléphone"
+                  value={editForm.phone}
+                  onChange={(e) => setEditForm((f) => ({ ...f, phone: e.target.value }))}
+                />
+                <input
+                  className="input"
+                  placeholder="Email"
+                  value={editForm.email}
+                  onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))}
+                />
+                <select
+                  className="input"
+                  value={editForm.team}
+                  onChange={(e) => setEditForm((f) => ({ ...f, team: e.target.value as Team }))}
+                >
+                  {TEAM_KEYS.map((t) => (
+                    <option key={t} value={t}>
+                      {TEAM_LABEL[t]}
+                    </option>
+                  ))}
                 </select>
-                <textarea className="input h-20" placeholder="Notes"
-                  value={editForm.notes} onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))} />
+                <textarea
+                  className="input h-20"
+                  placeholder="Notes"
+                  value={editForm.notes}
+                  onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))}
+                />
               </div>
 
               <div className="flex justify-end gap-2">
-                <button className="btn-ghost" onClick={() => setEditVolunteer(null)}>Annuler</button>
-                <button className="btn" onClick={onEditSave}>Enregistrer</button>
+                <button className="btn-ghost" onClick={() => setEditVolunteer(null)}>
+                  Annuler
+                </button>
+                <button className="btn" onClick={onEditSave}>
+                  Enregistrer
+                </button>
               </div>
             </>
           )}

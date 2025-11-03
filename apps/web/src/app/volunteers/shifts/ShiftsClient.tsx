@@ -11,6 +11,38 @@ import { Team, TEAM_KEYS, TEAM_LABEL } from "@/lib/teams";
 
 const TEAMS: Team[] = ["bar", "billetterie", "parking", "bassspatrouille", "tech", "autre"];
 
+/* ---------- helpers UI: surface cohérente avec les autres pages ---------- */
+const tileBase =
+  "group relative isolate overflow-hidden rounded-2xl border border-white/10 bg-white/5 " +
+  "backdrop-blur-md shadow-[0_10px_35px_-15px_rgba(0,0,0,.6)] " +
+  "transition-[transform,box-shadow,border-color,background] duration-300 will-change-transform " +
+  "hover:scale-[1.015] hover:bg-white/[0.07] " +
+  "hover:[border-color:color-mix(in_srgb,var(--accent)_35%,transparent)] " +
+  "focus-within:ring-2 focus-within:ring-[var(--accent)]/40 p-4 sm:p-5";
+
+function TileDecor() {
+  return (
+    <>
+      {/* halo conique piloté par le thème */}
+      <span aria-hidden className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity">
+        <span
+          className="absolute -inset-32 blur-3xl animate-[spin_24s_linear_infinite]"
+          style={{
+            background:
+              "conic-gradient(at top left, color-mix(in srgb, var(--cyan) 28%, transparent), color-mix(in srgb, var(--vio) 28%, transparent), color-mix(in srgb, var(--flame) 22%, transparent), color-mix(in srgb, var(--cyan) 28%, transparent))",
+          }}
+        />
+      </span>
+      {/* fin anneau subtil */}
+      <div
+        aria-hidden
+        className="absolute inset-0 rounded-2xl ring-1 ring-inset ring-[color-mix(in_srgb,var(--vio)_20%,transparent)] opacity-40 pointer-events-none group-hover:opacity-60"
+      />
+    </>
+  );
+}
+
+/* ---------- dates ---------- */
 function fromLocalDatetimeValue(val: string) {
   // '2025-07-12T18:00' -> ISO
   return new Date(val).toISOString();
@@ -23,12 +55,12 @@ export default function ShiftsClient({ initial }: { initial: Shift[] }) {
   const [openId, setOpenId] = useState<string | null>(null);
 
   useEffect(() => {
-  if (typeof window === "undefined") return;
-  if (window.location.hash) {
-    const el = document.querySelector(window.location.hash);
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
-  }
-}, []);
+    if (typeof window === "undefined") return;
+    if (window.location.hash) {
+      const el = document.querySelector(window.location.hash);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, []);
 
   // Create form
   const [showForm, setShowForm] = useState(false);
@@ -248,42 +280,58 @@ export default function ShiftsClient({ initial }: { initial: Shift[] }) {
         {grouped.map(([dayLabel, rows]) => (
           <section key={dayLabel} className="space-y-3">
             <h2 className="text-lg font-bold">{dayLabel}</h2>
+
             <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {rows.map((s) => (
-                <div key={s.id} id={`shift-${s.id}`} className="card neon space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm uppercase tracking-wide opacity-70">{s.team}</div>
-                    <div className="flex items-center gap-1">
-                      <button className="btn-ghost" onClick={() => setOpenId(openId === s.id ? null : s.id)}>
-                        {openId === s.id ? <ChevronUp size={16}/> : <ChevronDown size={16}/>} Gérer
-                      </button>
-                      <button className="btn-ghost" onClick={() => onDelete(s.id)} title="Supprimer">
-                        <Trash2 size={16} />
-                      </button>
+              {rows.map((s) => {
+                const isOpen = openId === s.id;
+                return (
+                  <div key={s.id} id={`shift-${s.id}`} className={tileBase}>
+                    <TileDecor />
+
+                    <div className="relative z-10 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="text-xs uppercase tracking-wide opacity-70">{TEAM_LABEL[s.team]}</div>
+                        <div className="flex items-center gap-1">
+                          <button className="btn-ghost" onClick={() => setOpenId(isOpen ? null : s.id)}>
+                            {isOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />} Gérer
+                          </button>
+                          <button className="btn-ghost" onClick={() => onDelete(s.id)} title="Supprimer">
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="text-lg font-semibold">{s.title}</div>
+
+                      <div className="text-sm flex items-center gap-2 opacity-80">
+                        <Calendar size={16} />
+                        <span>
+                          {new Date(s.startAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                          {" — "}
+                          {new Date(s.endAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                      </div>
+
+                      <div className="text-sm flex items-center gap-2 opacity-80">
+                        <MapPin size={16} />
+                        <span>{s.location || "—"}</span>
+                      </div>
+
+                      <div className="text-sm opacity-80">
+                        Capacité: <strong>{s.capacity}</strong>
+                      </div>
+
+                      {s.notes && <div className="text-xs opacity-70">{s.notes}</div>}
+
+                      {isOpen && (
+                        <div className="mt-3 pt-3 border-t border-white/10">
+                          <AssignmentsPanel shiftId={s.id} team={s.team} />
+                        </div>
+                      )}
                     </div>
                   </div>
-                  <div className="text-lg font-semibold">{s.title}</div>
-                  <div className="text-sm flex items-center gap-2 opacity-80">
-                    <Calendar size={16} />
-                    <span>
-                      {new Date(s.startAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                      {" — "}
-                      {new Date(s.endAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                    </span>
-                  </div>
-                  <div className="text-sm flex items-center gap-2 opacity-80">
-                    <MapPin size={16} />
-                    <span>{s.location || "—"}</span>
-                  </div>
-                  <div className="text-sm opacity-80">Capacité: <strong>{s.capacity}</strong></div>
-                  {s.notes && <div className="text-xs opacity-70">{s.notes}</div>}
-                  {openId === s.id && (
-                    <div className="mt-3 pt-3 border-t border-white/10">
-                      <AssignmentsPanel shiftId={s.id} team={s.team} />
-                    </div>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           </section>
         ))}
