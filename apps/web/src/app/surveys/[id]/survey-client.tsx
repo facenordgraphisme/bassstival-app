@@ -1,7 +1,7 @@
 "use client";
 
 import useSWR from "swr";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   getSurvey,
   addCandidate,
@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { ExternalLink, ChevronLeft, ChevronRight, Plus, Trash2, Pencil, Save } from "lucide-react";
 import { useSession } from "next-auth/react";
 import BackButton from "@/components/BackButton";
+import Image from "next/image";
 
 export default function SurveyClient({ surveyId }: { surveyId: string }) {
   const { data: session } = useSession();
@@ -33,8 +34,8 @@ export default function SurveyClient({ surveyId }: { surveyId: string }) {
   const current = candidates[i];
   const isOwner = data?.created_by === meId;
 
-  const next = () => setI(v => Math.min(v + 1, candidates.length - 1));
-  const prev = () => setI(v => Math.max(v - 1, 0));
+  const next = () => setI((v) => Math.min(v + 1, candidates.length - 1));
+  const prev = () => setI((v) => Math.max(v - 1, 0));
 
   /* ---------- ADD CANDIDATE (owner only) ---------- */
   const [createForm, setCreateForm] = useState({
@@ -59,8 +60,9 @@ export default function SurveyClient({ surveyId }: { surveyId: string }) {
       toast.success("Artiste ajouté", { id: t });
       setCreateForm({ artist_name: "", genre: "", youtube_link: "", image_url: "" });
       mutate();
-    } catch (e: any) {
-      toast.error(e?.message || "Erreur ajout", { id: t });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Erreur ajout";
+      toast.error(msg, { id: t });
     }
   };
 
@@ -94,8 +96,9 @@ export default function SurveyClient({ surveyId }: { surveyId: string }) {
       toast.success("Modifié", { id: t });
       setEditId(null);
       mutate();
-    } catch (e: any) {
-      toast.error(e?.message || "Erreur", { id: t });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Erreur";
+      toast.error(msg, { id: t });
     }
   };
   const del = async (id: string) => {
@@ -104,8 +107,9 @@ export default function SurveyClient({ surveyId }: { surveyId: string }) {
       await removeCandidate(surveyId, id);
       toast.success("Supprimé", { id: t });
       mutate();
-    } catch (e: any) {
-      toast.error(e?.message || "Erreur", { id: t });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Erreur";
+      toast.error(msg, { id: t });
     }
   };
 
@@ -116,23 +120,26 @@ export default function SurveyClient({ surveyId }: { surveyId: string }) {
       await voteCandidate(candidateId, choice);
       toast.success("Vote enregistré", { id: t });
       mutate();
-    } catch (e: any) {
-      toast.error(e?.message || "Erreur vote", { id: t });
+      // Si la synthèse est ouverte, on la refresh aussi
+      mutateVoters?.();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Erreur vote";
+      toast.error(msg, { id: t });
     }
   };
 
   const [showVoters, setShowVoters] = useState(false);
-    const { data: votersData, isLoading: votersLoading, mutate: mutateVoters } = useSWR<PollVoters>(
+  const { data: votersData, isLoading: votersLoading, mutate: mutateVoters } = useSWR<PollVoters>(
     showVoters ? ["survey-voters", surveyId] : null,
     () => getSurveyVoters(surveyId),
     { keepPreviousData: true }
-    );
+  );
 
   if (isLoading) return <div className="opacity-70 text-sm">Chargement…</div>;
   if (!data) return <div className="opacity-70 text-sm">Introuvable.</div>;
 
   const isFirst = i === 0;
-  const isLast  = i === candidates.length - 1;
+  const isLast = i === candidates.length - 1;
 
   return (
     <div className="space-y-6">
@@ -158,11 +165,8 @@ export default function SurveyClient({ surveyId }: { surveyId: string }) {
         >
           Ouvrir le sondage
         </button>
-        <button
-            className="btn-ghost"
-            onClick={() => setShowVoters(v => !v)}
-            >
-            {showVoters ? "Masquer les détails" : "Voir détails des votes"}
+        <button className="btn-ghost" onClick={() => setShowVoters((v) => !v)}>
+          {showVoters ? "Masquer les détails" : "Voir détails des votes"}
         </button>
       </div>
 
@@ -171,21 +175,35 @@ export default function SurveyClient({ surveyId }: { surveyId: string }) {
         <div className="card space-y-3">
           <div className="text-lg font-bold">Ajouter un artiste</div>
           <div className="grid md:grid-cols-2 gap-3">
-            <input className="input" placeholder="Nom de l’artiste"
+            <input
+              className="input"
+              placeholder="Nom de l’artiste"
               value={createForm.artist_name}
-              onChange={e => setCreateForm(f => ({ ...f, artist_name: e.target.value }))} />
-            <input className="input" placeholder="Genre musical"
+              onChange={(e) => setCreateForm((f) => ({ ...f, artist_name: e.target.value }))}
+            />
+            <input
+              className="input"
+              placeholder="Genre musical"
               value={createForm.genre}
-              onChange={e => setCreateForm(f => ({ ...f, genre: e.target.value }))} />
-            <input className="input" placeholder="Lien YouTube (chaîne)"
+              onChange={(e) => setCreateForm((f) => ({ ...f, genre: e.target.value }))}
+            />
+            <input
+              className="input"
+              placeholder="Lien YouTube (chaîne)"
               value={createForm.youtube_link}
-              onChange={e => setCreateForm(f => ({ ...f, youtube_link: e.target.value }))} />
-            <input className="input" placeholder="Image (URL) — optionnel"
+              onChange={(e) => setCreateForm((f) => ({ ...f, youtube_link: e.target.value }))}
+            />
+            <input
+              className="input"
+              placeholder="Image (URL) — optionnel"
               value={createForm.image_url}
-              onChange={e => setCreateForm(f => ({ ...f, image_url: e.target.value }))} />
+              onChange={(e) => setCreateForm((f) => ({ ...f, image_url: e.target.value }))}
+            />
           </div>
           <div className="flex justify-end">
-            <button className="btn" onClick={onAdd}><Plus size={16} className="mr-2" /> Ajouter</button>
+            <button className="btn" onClick={onAdd}>
+              <Plus size={16} className="mr-2" /> Ajouter
+            </button>
           </div>
         </div>
       )}
@@ -197,7 +215,7 @@ export default function SurveyClient({ surveyId }: { surveyId: string }) {
         </div>
       ) : (
         <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {candidates.map(c => (
+          {candidates.map((c) => (
             <div key={c.id} className="card neon space-y-3">
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -208,11 +226,21 @@ export default function SurveyClient({ surveyId }: { surveyId: string }) {
                   <ExternalLink size={16} />
                 </a>
               </div>
+
               {c.image_url ? (
-                <img src={c.image_url} alt={c.artist_name} className="w-full h-40 object-cover rounded-md border border-white/10" />
+                <div className="relative h-40 rounded-md overflow-hidden border border-white/10">
+                  <Image
+                    src={c.image_url}
+                    alt={c.artist_name}
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 768px) 100vw, 33vw"
+                  />
+                </div>
               ) : (
                 <div className="rounded-md border border-white/10 p-6 text-sm opacity-70">Aucune image</div>
               )}
+
               <div className="rounded-md bg-white/5 p-3 text-sm flex items-center justify-between">
                 <div className="opacity-80">Résultats</div>
                 <div className="font-mono">
@@ -237,71 +265,93 @@ export default function SurveyClient({ surveyId }: { surveyId: string }) {
       )}
 
       {showVoters && (
-    <div className="card space-y-4">
-        <div className="text-lg font-bold">Synthèse des votes</div>
-        {votersLoading && <div className="opacity-70 text-sm">Chargement…</div>}
-        {!votersLoading && (!votersData || votersData.candidates.length === 0) && (
-        <div className="opacity-70 text-sm">Aucun vote.</div>
-        )}
-        {votersData && votersData.candidates.map(cv => (
-        <div key={cv.id} className="rounded-md border border-white/10 p-3 space-y-2">
-            <div className="font-semibold">{cv.artist_name}</div>
-            <div className="grid md:grid-cols-3 gap-3 text-sm">
-            <div>
-                <div className="opacity-70 mb-1">Oui ({cv.voters.yes.length})</div>
-                <ul className="space-y-0.5">
-                {cv.voters.yes.map(u => (
-                    <li key={u.id} className="truncate">{u.name}</li>
-                ))}
-                {cv.voters.yes.length === 0 && <li className="opacity-60">—</li>}
-                </ul>
-            </div>
-            <div>
-                <div className="opacity-70 mb-1">Non ({cv.voters.no.length})</div>
-                <ul className="space-y-0.5">
-                {cv.voters.no.map(u => (
-                    <li key={u.id} className="truncate">{u.name}</li>
-                ))}
-                {cv.voters.no.length === 0 && <li className="opacity-60">—</li>}
-                </ul>
-            </div>
-            <div>
-                <div className="opacity-70 mb-1">Abstention ({cv.voters.abstain.length})</div>
-                <ul className="space-y-0.5">
-                {cv.voters.abstain.map(u => (
-                    <li key={u.id} className="truncate">{u.name}</li>
-                ))}
-                {cv.voters.abstain.length === 0 && <li className="opacity-60">—</li>}
-                </ul>
-            </div>
-            </div>
+        <div className="card space-y-4">
+          <div className="text-lg font-bold">Synthèse des votes</div>
+          {votersLoading && <div className="opacity-70 text-sm">Chargement…</div>}
+          {!votersLoading && (!votersData || votersData.candidates.length === 0) && (
+            <div className="opacity-70 text-sm">Aucun vote.</div>
+          )}
+          {votersData &&
+            votersData.candidates.map((cv) => (
+              <div key={cv.id} className="rounded-md border border-white/10 p-3 space-y-2">
+                <div className="font-semibold">{cv.artist_name}</div>
+                <div className="grid md:grid-cols-3 gap-3 text-sm">
+                  <div>
+                    <div className="opacity-70 mb-1">Oui ({cv.voters.yes.length})</div>
+                    <ul className="space-y-0.5">
+                      {cv.voters.yes.map((u) => (
+                        <li key={u.id} className="truncate">
+                          {u.name}
+                        </li>
+                      ))}
+                      {cv.voters.yes.length === 0 && <li className="opacity-60">—</li>}
+                    </ul>
+                  </div>
+                  <div>
+                    <div className="opacity-70 mb-1">Non ({cv.voters.no.length})</div>
+                    <ul className="space-y-0.5">
+                      {cv.voters.no.map((u) => (
+                        <li key={u.id} className="truncate">
+                          {u.name}
+                        </li>
+                      ))}
+                      {cv.voters.no.length === 0 && <li className="opacity-60">—</li>}
+                    </ul>
+                  </div>
+                  <div>
+                    <div className="opacity-70 mb-1">Abstention ({cv.voters.abstain.length})</div>
+                    <ul className="space-y-0.5">
+                      {cv.voters.abstain.map((u) => (
+                        <li key={u.id} className="truncate">
+                          {u.name}
+                        </li>
+                      ))}
+                      {cv.voters.abstain.length === 0 && <li className="opacity-60">—</li>}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            ))}
         </div>
-        ))}
-    </div>
-    )}
-
+      )}
 
       {/* Edit panel */}
       {isOwner && editId && (
         <div className="card space-y-3">
           <div className="text-lg font-bold">Modifier l’artiste</div>
           <div className="grid md:grid-cols-2 gap-3">
-            <input className="input" placeholder="Nom de l’artiste"
+            <input
+              className="input"
+              placeholder="Nom de l’artiste"
               value={editForm.artist_name}
-              onChange={e => setEditForm(f => ({ ...f, artist_name: e.target.value }))} />
-            <input className="input" placeholder="Genre musical"
+              onChange={(e) => setEditForm((f) => ({ ...f, artist_name: e.target.value }))}
+            />
+            <input
+              className="input"
+              placeholder="Genre musical"
               value={editForm.genre}
-              onChange={e => setEditForm(f => ({ ...f, genre: e.target.value }))} />
-            <input className="input" placeholder="Lien YouTube (chaîne)"
+              onChange={(e) => setEditForm((f) => ({ ...f, genre: e.target.value }))}
+            />
+            <input
+              className="input"
+              placeholder="Lien YouTube (chaîne)"
               value={editForm.youtube_link}
-              onChange={e => setEditForm(f => ({ ...f, youtube_link: e.target.value }))} />
-            <input className="input" placeholder="Image (URL) — optionnel"
+              onChange={(e) => setEditForm((f) => ({ ...f, youtube_link: e.target.value }))}
+            />
+            <input
+              className="input"
+              placeholder="Image (URL) — optionnel"
               value={editForm.image_url}
-              onChange={e => setEditForm(f => ({ ...f, image_url: e.target.value }))} />
+              onChange={(e) => setEditForm((f) => ({ ...f, image_url: e.target.value }))}
+            />
           </div>
           <div className="flex justify-end gap-2">
-            <button className="btn-ghost" onClick={() => setEditId(null)}>Annuler</button>
-            <button className="btn" onClick={saveEdit}><Save size={16} className="mr-2" /> Enregistrer</button>
+            <button className="btn-ghost" onClick={() => setEditId(null)}>
+              Annuler
+            </button>
+            <button className="btn" onClick={saveEdit}>
+              <Save size={16} className="mr-2" /> Enregistrer
+            </button>
           </div>
         </div>
       )}
@@ -312,7 +362,9 @@ export default function SurveyClient({ surveyId }: { surveyId: string }) {
           <div className="max-w-3xl w-full bg-zinc-900 rounded-xl border border-white/10 p-4 space-y-4">
             <div className="flex items-center justify-between">
               <div className="text-lg font-bold">{data.title}</div>
-              <button className="btn-ghost" onClick={() => setOpen(false)}>Fermer</button>
+              <button className="btn-ghost" onClick={() => setOpen(false)}>
+                Fermer
+              </button>
             </div>
 
             {current && (
@@ -328,17 +380,26 @@ export default function SurveyClient({ surveyId }: { surveyId: string }) {
                 </div>
 
                 {current.image_url ? (
-                  <img src={current.image_url} alt={current.artist_name}
-                       className="w-full h-64 object-cover rounded-lg border border-white/10" />
+                  <div className="relative h-64 rounded-lg overflow-hidden border border-white/10">
+                    <Image
+                      src={current.image_url}
+                      alt={current.artist_name}
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 768px) 100vw, 768px"
+                    />
+                  </div>
                 ) : (
-                  <div className="rounded-md border border-white/10 p-10 text-sm opacity-70 text-center">Aucune image</div>
+                  <div className="rounded-md border border-white/10 p-10 text-sm opacity-70 text-center">
+                    Aucune image
+                  </div>
                 )}
 
                 {/* Vote radio */}
                 <div className="space-y-2">
                   <div className="text-sm opacity-80">Votre vote :</div>
                   <div className="flex items-center gap-4">
-                    {(["yes","no","abstain"] as const).map(opt => (
+                    {(["yes", "no", "abstain"] as const).map((opt) => (
                       <label key={opt} className="inline-flex items-center gap-1 cursor-pointer">
                         <input
                           type="radio"
@@ -363,34 +424,36 @@ export default function SurveyClient({ surveyId }: { surveyId: string }) {
                 </div>
 
                 <div className="flex items-center justify-between">
-                    <button
-                        className={`btn-ghost inline-flex items-center gap-1 ${
-                        isFirst ? "opacity-40 cursor-not-allowed" : ""
-                        }`}
-                        onClick={isFirst ? undefined : prev}
-                        disabled={isFirst}
-                        aria-disabled={isFirst}
-                        tabIndex={isFirst ? -1 : 0}
-                        title={isFirst ? "Début" : "Précédent"}
-                    >
-                        <ChevronLeft size={16} /> Précédent
-                    </button>
+                  <button
+                    className={`btn-ghost inline-flex items-center gap-1 ${
+                      isFirst ? "opacity-40 cursor-not-allowed" : ""
+                    }`}
+                    onClick={isFirst ? undefined : prev}
+                    disabled={isFirst}
+                    aria-disabled={isFirst}
+                    tabIndex={isFirst ? -1 : 0}
+                    title={isFirst ? "Début" : "Précédent"}
+                  >
+                    <ChevronLeft size={16} /> Précédent
+                  </button>
 
-                    <div className="text-sm opacity-80">{i + 1} / {candidates.length}</div>
+                  <div className="text-sm opacity-80">
+                    {i + 1} / {candidates.length}
+                  </div>
 
-                    <button
-                        className={`btn-ghost inline-flex items-center gap-1 ${
-                        isLast ? "opacity-40 cursor-not-allowed" : ""
-                        }`}
-                        onClick={isLast ? undefined : next}
-                        disabled={isLast}
-                        aria-disabled={isLast}
-                        tabIndex={isLast ? -1 : 0}
-                        title={isLast ? "Dernier" : "Suivant"}
-                    >
-                        Suivant <ChevronRight size={16} />
-                    </button>
-                    </div>
+                  <button
+                    className={`btn-ghost inline-flex items-center gap-1 ${
+                      isLast ? "opacity-40 cursor-not-allowed" : ""
+                    }`}
+                    onClick={isLast ? undefined : next}
+                    disabled={isLast}
+                    aria-disabled={isLast}
+                    tabIndex={isLast ? -1 : 0}
+                    title={isLast ? "Dernier" : "Suivant"}
+                  >
+                    Suivant <ChevronRight size={16} />
+                  </button>
+                </div>
               </div>
             )}
           </div>

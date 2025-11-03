@@ -1,5 +1,20 @@
 const BASE = "/api/proxy";
 
+function isRecord(x: unknown): x is Record<string, unknown> {
+  return typeof x === "object" && x !== null;
+}
+
+function extractApiError(d: unknown): string | null {
+  if (isRecord(d)) {
+    const err = d["error"];
+    const msg = d["message"];
+    if (typeof err === "string" && err.trim()) return err;
+    if (typeof msg === "string" && msg.trim()) return msg;
+  }
+  if (typeof d === "string" && d.trim()) return d;
+  return null;
+}
+
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const url = `${BASE}${path.startsWith("/") ? "" : "/"}${path}`;
   const r = await fetch(url, {
@@ -7,10 +22,20 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
     headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
     cache: "no-store",
   });
+
   const text = await r.text();
   let data: unknown = null;
-  try { data = text ? JSON.parse(text) : null; } catch { data = text; }
-  if (!r.ok) throw new Error((data as any)?.error || `API ${r.status}`);
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = text;
+  }
+
+  if (!r.ok) {
+    const msg = extractApiError(data) ?? `API ${r.status}`;
+    throw new Error(msg);
+  }
+
   return data as T;
 }
 
