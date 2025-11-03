@@ -235,6 +235,7 @@ export default function SurveyClient({ surveyId }: { surveyId: string }) {
                     fill
                     className="object-cover"
                     sizes="(max-width: 768px) 100vw, 33vw"
+                    unoptimized
                   />
                 </div>
               ) : (
@@ -387,6 +388,7 @@ export default function SurveyClient({ surveyId }: { surveyId: string }) {
                       fill
                       className="object-cover"
                       sizes="(max-width: 768px) 100vw, 768px"
+                      unoptimized
                     />
                   </div>
                 ) : (
