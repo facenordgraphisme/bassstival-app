@@ -10,6 +10,7 @@ import artistsRouter from "./routes/artists";
 import authRouter, { requireAuth, requireRoles } from "./routes/auth";
 import usersRouter from "./routes/users";
 import pollsRouter from "./routes/polls";
+import warmupRouter from "./routes/warmup";
 
 const app = express();
 
@@ -21,6 +22,7 @@ app.use(express.json({ limit: "1mb" }));
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
 app.use("/auth", authRouter);
+app.use("/warmup", warmupRouter);
 
 app.use("/loans", requireAuth, requireRoles("admin", "staff", "tools"), loansRouter);
 app.use("/volunteers", requireAuth, requireRoles("admin", "staff", "volunteers"), volunteersRouter);
