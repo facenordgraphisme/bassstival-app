@@ -5,6 +5,7 @@ import { Unbounded, Inter } from "next/font/google";
 import { Toaster } from "sonner";
 import Navbar from "@/components/Navbar";
 import Providers from "./providers"; // ⬅️
+import WarmupClient from "@/components/WarmupClient";
 
 const unbounded = Unbounded({ subsets: ["latin"], variable: "--font-title" });
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
@@ -22,6 +23,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <div className="triangles" />
           <Navbar />
           <Toaster richColors position="bottom-right" closeButton />
+          <WarmupClient />
           <main className="mx-auto max-w-6xl p-6 space-y-8">{children}</main>
         </Providers>
       </body>
