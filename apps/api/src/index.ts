@@ -11,6 +11,7 @@ import authRouter, { requireAuth, requireRoles } from "./routes/auth";
 import usersRouter from "./routes/users";
 import pollsRouter from "./routes/polls";
 import warmupRouter from "./routes/warmup";
+import communicationRouter from "./routes/communication";
 
 const app = express();
 
@@ -28,6 +29,7 @@ app.use("/loans", requireAuth, requireRoles("admin", "staff", "tools"), loansRou
 app.use("/volunteers", requireAuth, requireRoles("admin", "staff", "volunteers"), volunteersRouter);
 app.use("/artists-api", requireAuth, requireRoles("admin", "staff", "lineup"), artistsRouter);
 app.use("/polls", requireAuth, requireRoles("polls", "admin"), pollsRouter);
+app.use("/communication", requireAuth, requireRoles("admin", "staff", "communication"), communicationRouter);
 
 // ✅ protéger /users-api (profil)
 app.use("/users-api", requireAuth, usersRouter);

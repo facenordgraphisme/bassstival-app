@@ -95,6 +95,7 @@ export default async function Page() {
   const canLineup = hasAnyRole(roles, SECTION_PERMS.lineup);
   const canAdmin = hasAnyRole(roles, SECTION_PERMS.admin);
   const canPolls = roles.includes("polls");
+  const canCommunication = hasAnyRole(roles, SECTION_PERMS.communication);
 
   return (
     <div className="relative">
@@ -174,6 +175,7 @@ export default async function Page() {
             {canLineup && <Tile href="/lineup" title="Line-Up" desc="Bookings, planning, exports & impressions." icon={<Music3 size={28} aria-hidden />} />}
             {canAdmin && <Tile href="/admin/users" title="Admin" desc="Utilisateurs, rôles & sécurité." icon={<Shield size={28} aria-hidden />} />}
             {canPolls && <Tile href="/surveys" title="Sondages" desc="Propose, vote, analyse les résultats." icon={<CheckCircle size={28} aria-hidden />} />}
+            {canCommunication && <Tile href="/communication" title="Communication" desc="Espace communication" icon={<CheckCircle size={28} aria-hidden />} />}
           </div>
         </div>
       </FadeUp>

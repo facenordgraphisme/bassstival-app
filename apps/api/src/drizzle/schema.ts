@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, integer, timestamp, pgEnum,uniqueIndex, boolean, numeric, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, integer, timestamp, pgEnum,uniqueIndex, boolean, numeric, primaryKey, jsonb, index } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm"; 
 
 
@@ -91,13 +91,14 @@ export const checkins = pgTable("checkins", {
 // utilisateurs + rôles --- //
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
-  email: text("email").notNull(),                  // n’oublie pas l’unique index dans la migration
+  email: text("email").notNull(),
   displayName: text("display_name"),
-  passwordHash: text("password_hash").notNull(),   // <-- NOUVEAU
-  roles: text("roles").array().notNull().default(sql`'{}'::text[]`), // <-- NOUVEAU (array)
+  passwordHash: text("password_hash").notNull(),
+  roles: text("roles").array().notNull().default(sql`'{}'::text[]`),
   createdAt: timestamp("created_at").defaultNow(),
-});
-
+}, (t) => ({
+  uqEmail: uniqueIndex("uq_users_email").on(t.email),
+}));
 // BOOKING ARTISTES
 
 export const artistStatus = pgEnum("artist_status", ["prospect", "pending", "confirmed", "canceled"]);
@@ -187,6 +188,7 @@ export const pollCandidates = pgTable("poll_candidates", {
   genre: text("genre").notNull(),
   youtubeLink: text("youtube_link").notNull(),
   imageUrl: text("image_url"),
+  description: text("description"),
   order: integer("order").notNull().default(0),   // tri d'affichage
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -200,4 +202,73 @@ export const pollVotes = pgTable("poll_votes", {
 }, (t) => ({
   // 1 utilisateur = 1 vote par artiste
   uqCandidateUser: uniqueIndex("uq_pollvote_candidate_user").on(t.candidateId, t.userId),
+}));
+
+export const commChannel = pgEnum("comm_channel", [
+  "instagram_post",
+  "instagram_story",
+  "instagram_reel",
+  "facebook_post",
+  "tiktok",
+  "linkedin",
+  "email",
+  "site_page",
+  "press",
+]);
+
+export const commStatus = pgEnum("comm_status", [
+  "idea",
+  "draft",
+  "approved",
+  "scheduled",
+  "published",
+  "canceled",
+]);
+
+export const commEvents = pgTable("comm_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  title: text("title").notNull(),
+  channels: commChannel("channels").array().notNull(),
+  status: commStatus("status").notNull().default("idea"),
+  scheduledAt: timestamp("scheduled_at"),
+  publishedAt: timestamp("published_at"),
+  body: text("body"),
+  hashtags: text("hashtags"),
+  linkUrl: text("link_url"),
+  assets: jsonb("assets").$type<{ kind: "image"|"video"; url: string; alt?: string }[]>().default(sql`'[]'::jsonb`),
+  tags: text("tags").array(), // ex: ["artist","food","tickets"]
+  extra: jsonb("extra").$type<Record<string, unknown>>().default(sql`'{}'::jsonb`),
+  ownerId: uuid("owner_id").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => ({
+   byScheduled: index("ix_comm_events_scheduled_status").on(t.scheduledAt, t.status),
+}));
+
+export const commStatusHistory = pgTable("comm_status_history", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  eventId: uuid("event_id").references(() => commEvents.id, { onDelete: "cascade" }).notNull(),
+  fromStatus: commStatus("from_status"),
+  toStatus: commStatus("to_status").notNull(),
+  changedBy: uuid("changed_by").references(() => users.id, { onDelete: "set null" }),
+  changedAt: timestamp("changed_at").defaultNow(),
+  note: text("note"),
+}, (t) => ({
+  byEvent: index("ix_comm_status_history_event_time").on(t.eventId, t.changedAt),
+}));
+
+export const commPublications = pgTable("comm_publications", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  title: text("title").notNull(),
+  channels: commChannel("channels").array().notNull(),
+  body: text("body").notNull(),
+  hashtags: text("hashtags"),
+  linkUrl: text("link_url"),
+  assets: jsonb("assets").$type<{ kind: "image"|"video"; url: string; alt?: string }[]>().default(sql`'[]'::jsonb`),
+  tags: text("tags").array(),
+  createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => ({
+  byUpdated: index("ix_comm_publications_updated").on(t.updatedAt),
 }));

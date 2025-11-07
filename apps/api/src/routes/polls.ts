@@ -15,6 +15,13 @@ const zSurveyCreate = z.object({
   description: z.string().trim().optional(),
 });
 
+const zSurveyPatch = z.object({
+  title: z.string().trim().min(1).optional(),
+  description: z.string().trim().optional(), // vide => on mettra null
+}).refine(d => d.title !== undefined || d.description !== undefined, {
+  message: "Empty patch",
+});
+
 const toUrl = z
   .string()
   .trim()
@@ -29,6 +36,7 @@ const zCandidateCreate = z.object({
     (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
     z.string().url().optional()
   ),
+  description: z.string().trim().optional(),
   order: z.number().int().min(0).optional(),
 });
 
@@ -40,6 +48,7 @@ const zCandidatePatch = z.object({
     (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
     z.string().url().optional()
   ),
+  description: z.string().trim().optional(),
   order: z.number().int().min(0).optional(),
 });
 
@@ -70,14 +79,49 @@ async function ensureSurveyOwner(surveyId: string, userId: string): Promise<Ensu
 
 // GET /polls — liste des surveys (sans détail)
 router.get("/", requireAuth, requireRoles("polls"), async (_req, res) => {
-  const rows = await db.select().from(pollSurveys).orderBy(asc(pollSurveys.createdAt));
-  res.json(rows.map(s => ({
-    id: s.id,
-    title: s.title,
-    description: s.description ?? null,
-    created_by: s.createdBy,
-    created_at: s.createdAt,
-  })));
+  // jointure auteur + agrégat du nombre de candidats
+  const rows = await db
+    .select({
+      id: pollSurveys.id,
+      title: pollSurveys.title,
+      description: pollSurveys.description,
+      created_by: pollSurveys.createdBy,
+      created_at: pollSurveys.createdAt,
+
+      // auteur
+      author_name: users.displayName,
+      author_email: users.email,
+
+      // nombre de candidats
+      candidates_count: sql<number>`count(${pollCandidates.id})`.as("candidates_count"),
+    })
+    .from(pollSurveys)
+    .leftJoin(users, eq(users.id, pollSurveys.createdBy))
+    .leftJoin(pollCandidates, eq(pollCandidates.surveyId, pollSurveys.id))
+    .groupBy(
+      pollSurveys.id,
+      pollSurveys.title,
+      pollSurveys.description,
+      pollSurveys.createdBy,
+      pollSurveys.createdAt,
+      users.displayName,
+      users.email
+    )
+    .orderBy(asc(pollSurveys.createdAt));
+
+  res.json(
+    rows.map((r) => ({
+      id: String(r.id),
+      title: r.title,
+      description: r.description ?? null,
+      created_by: String(r.created_by),
+      created_at: r.created_at,
+      candidates_count: Number(r.candidates_count ?? 0),
+      creator_name:
+        (r.author_name && String(r.author_name)) ||
+        (r.author_email ? String(r.author_email).split("@")[0] : "—"),
+    }))
+  );
 });
 
 // POST /polls — créer un survey
@@ -157,6 +201,7 @@ router.get("/:surveyId", requireAuth, requireRoles("polls"), async (req, res) =>
       genre: c.genre,
       youtube_link: c.youtubeLink,
       image_url: c.imageUrl ?? null,
+      description: c.description ?? null,
       order: c.order,
       results: counts.get(c.id) ?? { yes: 0, no: 0, abstain: 0 },
       my_vote: (myMap.get(c.id) as "yes" | "no" | "abstain" | undefined) ?? null,
@@ -187,6 +232,7 @@ router.post("/:surveyId/candidates", requireAuth, requireRoles("polls"), async (
     genre: parsed.data.genre,
     youtubeLink: parsed.data.youtube_link,
     imageUrl: parsed.data.image_url,
+    description: parsed.data.description ?? null,
     order: parsed.data.order ?? 0,
   } as any).returning();
 
@@ -196,6 +242,7 @@ router.post("/:surveyId/candidates", requireAuth, requireRoles("polls"), async (
     genre: created.genre,
     youtube_link: created.youtubeLink,
     image_url: created.imageUrl ?? null,
+    description: created.description ?? null,
     order: created.order,
   });
 });
@@ -222,6 +269,7 @@ router.patch("/:surveyId/candidates/:id", requireAuth, requireRoles("polls"), as
   if (parsed.data.genre !== undefined) patch.genre = parsed.data.genre;
   if (parsed.data.youtube_link !== undefined) patch.youtubeLink = parsed.data.youtube_link;
   if (parsed.data.image_url !== undefined) patch.imageUrl = parsed.data.image_url;
+  if (parsed.data.description !== undefined) patch.description = parsed.data.description ?? null;
   if (parsed.data.order !== undefined) patch.order = parsed.data.order;
 
   const [updated] = await db.update(pollCandidates).set(patch).where(eq(pollCandidates.id, id)).returning();
@@ -233,7 +281,45 @@ router.patch("/:surveyId/candidates/:id", requireAuth, requireRoles("polls"), as
     genre: updated.genre,
     youtube_link: updated.youtubeLink,
     image_url: updated.imageUrl ?? null,
+    description: updated.description ?? null, 
     order: updated.order,
+  });
+});
+
+router.patch("/:surveyId", requireAuth, requireRoles("polls", "admin"), async (req, res) => {
+  const { surveyId } = req.params;
+  const claims = (req as any).user as { sub?: string; roles?: string[] } | undefined;
+  const userId = String(claims?.sub || "");
+  const roles = (claims?.roles ?? []) as string[];
+
+  const [s] = await db.select().from(pollSurveys).where(eq(pollSurveys.id, surveyId)).limit(1);
+  if (!s) return res.status(404).json({ error: "Not found" });
+
+  const isOwner = String(s.createdBy) === userId;
+  const isAdmin = roles.includes("admin");
+  if (!isOwner && !isAdmin) return res.status(403).json({ error: "Forbidden" });
+
+  const parsed = zSurveyPatch.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Invalid body", details: parsed.error.flatten() });
+
+  const patch: any = {};
+  if (parsed.data.title !== undefined) patch.title = parsed.data.title.trim();
+  if (parsed.data.description !== undefined) {
+    const d = parsed.data.description.trim();
+    patch.description = d.length ? d : null;
+  }
+
+  if (Object.keys(patch).length === 0) {
+    return res.status(400).json({ error: "Nothing to update" });
+  }
+
+  const [updated] = await db.update(pollSurveys).set(patch).where(eq(pollSurveys.id, surveyId)).returning();
+  return res.json({
+    id: updated.id,
+    title: updated.title,
+    description: updated.description ?? null,
+    created_by: updated.createdBy,
+    created_at: updated.createdAt,
   });
 });
 

@@ -82,7 +82,8 @@ const [greetKey, setGreetKey] = useState(0);
   const canVolunteers = canAccess(roles, "volunteers");
   const canLineup = canAccess(roles, "lineup");
   const canAdmin = canAccess(roles, "admin");
-  const canPolls = roles?.includes("polls");
+const canPolls = roles?.includes("polls");
+const canCommunication = canAccess(roles, "communication");
 
   return (
     <header className="sticky top-0 z-20 backdrop-blur bg-black/50 border-b border-white/10">
@@ -146,6 +147,11 @@ const [greetKey, setGreetKey] = useState(0);
                 {canPolls && (
                   <NavLink href="/surveys" icon={<CheckCircle size={14} />}>
                     Sondages
+                  </NavLink>
+                )}
+                {canCommunication && (
+                  <NavLink href="/communication" icon={<CheckCircle size={14} />}>
+                    Communication
                   </NavLink>
                 )}
               </div>
@@ -263,6 +269,11 @@ const [greetKey, setGreetKey] = useState(0);
               {canPolls && (
                 <NavLink href="/surveys" icon={<CheckCircle size={14} />} onClick={() => setOpen(false)}>
                   Sondages
+                </NavLink>
+              )}
+              {canCommunication && (
+                <NavLink href="/communication" icon={<CheckCircle size={14} />} onClick={() => setOpen(false)}>
+                  Communication
                 </NavLink>
               )}
             </div>

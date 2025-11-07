@@ -1,7 +1,7 @@
 "use client";
 
 import useSWR from "swr";
-import { useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   getSurvey,
   addCandidate,
@@ -12,10 +12,143 @@ import {
 } from "@/lib/polls";
 import { getSurveyVoters, type PollVoters } from "@/lib/polls";
 import { toast } from "sonner";
-import { ExternalLink, ChevronLeft, ChevronRight, Plus, Trash2, Pencil, Save } from "lucide-react";
+import {
+  ExternalLink,
+  ChevronLeft,
+  ChevronRight,
+  Plus,
+  Trash2,
+  Pencil,
+  Save,
+  X,
+} from "lucide-react";
 import { useSession } from "next-auth/react";
 import BackButton from "@/components/BackButton";
 import Image from "next/image";
+
+/* ---------- Modal d'édition ---------- */
+function EditCandidateModal({
+  open,
+  onClose,
+  onSave,
+  form,
+  setForm,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSave: () => void;
+  form: {
+    artist_name: string;
+    genre: string;
+    youtube_link: string;
+    image_url: string;
+    description: string;
+  };
+  setForm: React.Dispatch<
+    React.SetStateAction<{
+      artist_name: string;
+      genre: string;
+      youtube_link: string;
+      image_url: string;
+      description: string;
+    }>
+  >;
+}) {
+  // Fermer sur ESC
+  const onKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if (!open) return;
+      if (e.key === "Escape") onClose();
+    },
+    [open, onClose]
+  );
+
+  useEffect(() => {
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [onKeyDown]);
+
+  // Bloquer le scroll arrière-plan quand la modale est ouverte
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+      {/* overlay click */}
+      <div
+        className="absolute inset-0"
+        onClick={onClose}
+        aria-hidden
+      />
+      <div
+        className="
+          relative max-w-2xl w-full rounded-xl border border-white/10
+          bg-zinc-900 p-4 md:p-5 space-y-4
+          shadow-[0_25px_80px_rgba(0,0,0,.55)]
+        "
+        role="dialog"
+        aria-modal="true"
+      >
+        <div className="flex items-center justify-between">
+          <div className="text-lg font-bold">Modifier l’artiste</div>
+          <button className="btn-ghost" onClick={onClose} title="Fermer">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-3">
+          <input
+            className="input"
+            placeholder="Nom de l’artiste"
+            value={form.artist_name}
+            onChange={(e) => setForm((f) => ({ ...f, artist_name: e.target.value }))}
+          />
+          <input
+            className="input"
+            placeholder="Genre musical"
+            value={form.genre}
+            onChange={(e) => setForm((f) => ({ ...f, genre: e.target.value }))}
+          />
+          <textarea
+            className="input md:col-span-2 min-h-24"
+            placeholder="Description"
+            value={form.description}
+            onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+          />
+          <input
+            className="input"
+            placeholder="Lien YouTube (chaîne)"
+            value={form.youtube_link}
+            onChange={(e) => setForm((f) => ({ ...f, youtube_link: e.target.value }))}
+          />
+          <input
+            className="input"
+            placeholder="Image (URL) — optionnel"
+            value={form.image_url}
+            onChange={(e) => setForm((f) => ({ ...f, image_url: e.target.value }))}
+          />
+        </div>
+
+        <div className="flex justify-end gap-2">
+          <button className="btn-ghost" onClick={onClose}>
+            Annuler
+          </button>
+          <button className="btn" onClick={onSave}>
+            <Save size={16} className="mr-2" /> Enregistrer
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function SurveyClient({ surveyId }: { surveyId: string }) {
   const { data: session } = useSession();
@@ -43,9 +176,14 @@ export default function SurveyClient({ surveyId }: { surveyId: string }) {
     genre: "",
     youtube_link: "",
     image_url: "",
+    description: "",
   });
   const onAdd = async () => {
-    if (!createForm.artist_name.trim() || !createForm.genre.trim() || !createForm.youtube_link.trim()) {
+    if (
+      !createForm.artist_name.trim() ||
+      !createForm.genre.trim() ||
+      !createForm.youtube_link.trim()
+    ) {
       return toast.error("Nom artiste, genre et lien YouTube sont requis");
     }
     const t = toast.loading("Ajout…");
@@ -55,10 +193,17 @@ export default function SurveyClient({ surveyId }: { surveyId: string }) {
         genre: createForm.genre.trim(),
         youtube_link: createForm.youtube_link.trim(),
         image_url: createForm.image_url.trim() || undefined,
+        description: createForm.description.trim() || undefined,
         order: candidates.length,
       });
       toast.success("Artiste ajouté", { id: t });
-      setCreateForm({ artist_name: "", genre: "", youtube_link: "", image_url: "" });
+      setCreateForm({
+        artist_name: "",
+        genre: "",
+        youtube_link: "",
+        image_url: "",
+        description: "",
+      });
       mutate();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Erreur ajout";
@@ -73,6 +218,7 @@ export default function SurveyClient({ surveyId }: { surveyId: string }) {
     genre: "",
     youtube_link: "",
     image_url: "",
+    description: "",
   });
   const openEdit = (c: PollSurveyDetail["candidates"][number]) => {
     setEditId(c.id);
@@ -81,6 +227,7 @@ export default function SurveyClient({ surveyId }: { surveyId: string }) {
       genre: c.genre,
       youtube_link: c.youtube_link,
       image_url: c.image_url ?? "",
+      description: (c as any).description ?? "",
     });
   };
   const saveEdit = async () => {
@@ -92,6 +239,7 @@ export default function SurveyClient({ surveyId }: { surveyId: string }) {
         genre: editForm.genre.trim(),
         youtube_link: editForm.youtube_link.trim(),
         image_url: editForm.image_url.trim() || undefined,
+        description: editForm.description.trim() || undefined,
       });
       toast.success("Modifié", { id: t });
       setEditId(null);
@@ -120,7 +268,6 @@ export default function SurveyClient({ surveyId }: { surveyId: string }) {
       await voteCandidate(candidateId, choice);
       toast.success("Vote enregistré", { id: t });
       mutate();
-      // Si la synthèse est ouverte, on la refresh aussi
       mutateVoters?.();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Erreur vote";
@@ -129,7 +276,11 @@ export default function SurveyClient({ surveyId }: { surveyId: string }) {
   };
 
   const [showVoters, setShowVoters] = useState(false);
-  const { data: votersData, isLoading: votersLoading, mutate: mutateVoters } = useSWR<PollVoters>(
+  const {
+    data: votersData,
+    isLoading: votersLoading,
+    mutate: mutateVoters,
+  } = useSWR<PollVoters>(
     showVoters ? ["survey-voters", surveyId] : null,
     () => getSurveyVoters(surveyId),
     { keepPreviousData: true }
@@ -143,60 +294,60 @@ export default function SurveyClient({ surveyId }: { surveyId: string }) {
 
   return (
     <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
-            {/* Bloc gauche : titre + description */}
-            <div className="w-full sm:w-auto">
-                {/* Ligne titre + retour + badge */}
-                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                <BackButton className="!px-2.5 !py-1.5" />
-                <h1
-                    className="text-2xl md:text-3xl font-extrabold leading-tight break-words whitespace-normal title-underline"
-                    style={{ fontFamily: "var(--font-title)" }}
-                >
-                    {data.title}
-                </h1>
-                <span className="rounded-full border border-white/10 px-2 py-0.5 text-xs md:text-sm opacity-80">
-                    {candidates.length} champ{candidates.length > 1 ? "s" : ""}
-                </span>
-                </div>
+      {/* Header */}
+      <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
+        {/* Bloc gauche : titre + description */}
+        <div className="w-full sm:w-auto">
+          {/* Ligne titre + retour + badge */}
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <BackButton className="!px-2.5 !py-1.5" />
+            <h1
+              className="text-2xl md:text-3xl font-extrabold leading-tight break-words whitespace-normal title-underline"
+              style={{ fontFamily: "var(--font-title)" }}
+            >
+              {data.title}
+            </h1>
+            <span className="rounded-full border border-white/10 px-2 py-0.5 text-xs md:text-sm opacity-80">
+              {candidates.length} champ{candidates.length > 1 ? "s" : ""}
+            </span>
+          </div>
 
-                {/* Description */}
-                {data.description && (
-                <p className="opacity-80 text-sm md:text-base leading-relaxed mt-3 pl-10 sm:pl-[3.2rem] max-w-2xl">
-                    {data.description}
-                </p>
-                )}
-            </div>
+          {/* Description */}
+          {data.description && (
+            <p className="opacity-80 text-sm md:text-base leading-relaxed mt-3 pl-10 sm:pl-[3.2rem] max-w-2xl">
+              {data.description}
+            </p>
+          )}
+        </div>
 
-            {/* Bloc droit : actions */}
-            <div className="flex flex-wrap gap-2 sm:flex-nowrap sm:justify-end w-full sm:w-auto sm:pt-1">
-                <button
-                className="btn w-full sm:w-auto"
-                onClick={() => {
-                    if (candidates.length === 0) {
-                    toast.info(
-                        isOwner
-                        ? "Ajoute d’abord des artistes au sondage"
-                        : "Aucun artiste dans ce sondage"
-                    );
-                    return;
-                    }
-                    setI(0);
-                    setOpen(true);
-                }}
-                >
-                Ouvrir le sondage
-                </button>
+        {/* Bloc droit : actions */}
+        <div className="flex flex-wrap gap-2 sm:flex-nowrap sm:justify-end w-full sm:w-auto sm:pt-1">
+          <button
+            className="btn w-full sm:w-auto"
+            onClick={() => {
+              if (candidates.length === 0) {
+                toast.info(
+                  isOwner
+                    ? "Ajoute d’abord des artistes au sondage"
+                    : "Aucun artiste dans ce sondage"
+                );
+                return;
+              }
+              setI(0);
+              setOpen(true);
+            }}
+          >
+            Ouvrir le sondage
+          </button>
 
-                <button
-                className="btn-ghost w-full sm:w-auto"
-                onClick={() => setShowVoters((v) => !v)}
-                >
-                {showVoters ? "Masquer les détails" : "Voir détails des votes"}
-                </button>
-            </div>
-            </div>
+          <button
+            className="btn-ghost w-full sm:w-auto"
+            onClick={() => setShowVoters((v) => !v)}
+          >
+            {showVoters ? "Masquer les détails" : "Voir détails des votes"}
+          </button>
+        </div>
+      </div>
 
       {/* Owner: add form */}
       {isOwner && (
@@ -207,25 +358,41 @@ export default function SurveyClient({ surveyId }: { surveyId: string }) {
               className="input"
               placeholder="Nom de l’artiste"
               value={createForm.artist_name}
-              onChange={(e) => setCreateForm((f) => ({ ...f, artist_name: e.target.value }))}
+              onChange={(e) =>
+                setCreateForm((f) => ({ ...f, artist_name: e.target.value }))
+              }
             />
             <input
               className="input"
               placeholder="Genre musical"
               value={createForm.genre}
-              onChange={(e) => setCreateForm((f) => ({ ...f, genre: e.target.value }))}
+              onChange={(e) =>
+                setCreateForm((f) => ({ ...f, genre: e.target.value }))
+              }
+            />
+            <textarea
+              className="input md:col-span-2 min-h-24"
+              placeholder="Description (quelques phrases) – optionnel"
+              value={createForm.description}
+              onChange={(e) =>
+                setCreateForm((f) => ({ ...f, description: e.target.value }))
+              }
             />
             <input
               className="input"
               placeholder="Lien YouTube ou autre"
               value={createForm.youtube_link}
-              onChange={(e) => setCreateForm((f) => ({ ...f, youtube_link: e.target.value }))}
+              onChange={(e) =>
+                setCreateForm((f) => ({ ...f, youtube_link: e.target.value }))
+              }
             />
             <input
               className="input"
               placeholder="Image (URL) — optionnel"
               value={createForm.image_url}
-              onChange={(e) => setCreateForm((f) => ({ ...f, image_url: e.target.value }))}
+              onChange={(e) =>
+                setCreateForm((f) => ({ ...f, image_url: e.target.value }))
+              }
             />
           </div>
           <div className="flex justify-end">
@@ -239,7 +406,8 @@ export default function SurveyClient({ surveyId }: { surveyId: string }) {
       {/* Liste des artistes */}
       {candidates.length === 0 ? (
         <div className="opacity-70 text-sm">
-          Aucun artiste dans ce sondage.{isOwner ? " Ajoute des artistes via le formulaire ci-dessus." : ""}
+          Aucun artiste dans ce sondage.
+          {isOwner ? " Ajoute des artistes via le formulaire ci-dessus." : ""}
         </div>
       ) : (
         <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -285,15 +453,20 @@ export default function SurveyClient({ surveyId }: { surveyId: string }) {
               {/* CONTENU */}
               <div className="relative z-10 p-5 space-y-3">
                 <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="font-semibold">{c.artist_name}</div>
+                  <div className="min-w-0">
+                    <div className="font-semibold truncate">{c.artist_name}</div>
                     <div className="text-sm opacity-80">{c.genre}</div>
+                    {(c as any).description && (
+                      <p className="text-sm opacity-80 mt-1 line-clamp-3">
+                        {(c as any).description}
+                      </p>
+                    )}
                   </div>
                   <a
                     href={c.youtube_link}
                     target="_blank"
                     rel="noreferrer"
-                    className="btn-ghost"
+                    className="btn-ghost shrink-0"
                     title="Ouvrir le lien"
                   >
                     <ExternalLink size={16} />
@@ -336,7 +509,6 @@ export default function SurveyClient({ surveyId }: { surveyId: string }) {
                 )}
               </div>
             </div>
-
           ))}
         </div>
       )}
@@ -354,7 +526,9 @@ export default function SurveyClient({ surveyId }: { surveyId: string }) {
                 <div className="font-semibold">{cv.artist_name}</div>
                 <div className="grid md:grid-cols-3 gap-3 text-sm">
                   <div>
-                    <div className="opacity-70 mb-1">Oui ({cv.voters.yes.length})</div>
+                    <div className="opacity-70 mb-1">
+                      Oui ({cv.voters.yes.length})
+                    </div>
                     <ul className="space-y-0.5">
                       {cv.voters.yes.map((u) => (
                         <li key={u.id} className="truncate">
@@ -365,7 +539,9 @@ export default function SurveyClient({ surveyId }: { surveyId: string }) {
                     </ul>
                   </div>
                   <div>
-                    <div className="opacity-70 mb-1">Non ({cv.voters.no.length})</div>
+                    <div className="opacity-70 mb-1">
+                      Non ({cv.voters.no.length})
+                    </div>
                     <ul className="space-y-0.5">
                       {cv.voters.no.map((u) => (
                         <li key={u.id} className="truncate">
@@ -376,7 +552,9 @@ export default function SurveyClient({ surveyId }: { surveyId: string }) {
                     </ul>
                   </div>
                   <div>
-                    <div className="opacity-70 mb-1">Abstention ({cv.voters.abstain.length})</div>
+                    <div className="opacity-70 mb-1">
+                      Abstention ({cv.voters.abstain.length})
+                    </div>
                     <ul className="space-y-0.5">
                       {cv.voters.abstain.map((u) => (
                         <li key={u.id} className="truncate">
@@ -389,47 +567,6 @@ export default function SurveyClient({ surveyId }: { surveyId: string }) {
                 </div>
               </div>
             ))}
-        </div>
-      )}
-
-      {/* Edit panel */}
-      {isOwner && editId && (
-        <div className="card space-y-3">
-          <div className="text-lg font-bold">Modifier l’artiste</div>
-          <div className="grid md:grid-cols-2 gap-3">
-            <input
-              className="input"
-              placeholder="Nom de l’artiste"
-              value={editForm.artist_name}
-              onChange={(e) => setEditForm((f) => ({ ...f, artist_name: e.target.value }))}
-            />
-            <input
-              className="input"
-              placeholder="Genre musical"
-              value={editForm.genre}
-              onChange={(e) => setEditForm((f) => ({ ...f, genre: e.target.value }))}
-            />
-            <input
-              className="input"
-              placeholder="Lien YouTube (chaîne)"
-              value={editForm.youtube_link}
-              onChange={(e) => setEditForm((f) => ({ ...f, youtube_link: e.target.value }))}
-            />
-            <input
-              className="input"
-              placeholder="Image (URL) — optionnel"
-              value={editForm.image_url}
-              onChange={(e) => setEditForm((f) => ({ ...f, image_url: e.target.value }))}
-            />
-          </div>
-          <div className="flex justify-end gap-2">
-            <button className="btn-ghost" onClick={() => setEditId(null)}>
-              Annuler
-            </button>
-            <button className="btn" onClick={saveEdit}>
-              <Save size={16} className="mr-2" /> Enregistrer
-            </button>
-          </div>
         </div>
       )}
 
@@ -450,8 +587,18 @@ export default function SurveyClient({ surveyId }: { surveyId: string }) {
                   <div>
                     <div className="text-xl font-semibold">{current.artist_name}</div>
                     <div className="opacity-80">{current.genre}</div>
+                    {(current as any).description && (
+                      <p className="text-sm opacity-80 mt-2 max-w-prose">
+                        {(current as any).description}
+                      </p>
+                    )}
                   </div>
-                  <a href={current.youtube_link} target="_blank" rel="noreferrer" className="btn-ghost">
+                  <a
+                    href={current.youtube_link}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="btn-ghost"
+                  >
                     <ExternalLink size={16} />
                   </a>
                 </div>
@@ -497,7 +644,8 @@ export default function SurveyClient({ surveyId }: { surveyId: string }) {
                 <div className="rounded-md bg-white/5 p-3 text-sm flex items-center justify-between">
                   <div className="opacity-80">Résultats :</div>
                   <div className="font-mono">
-                    Oui {current.results.yes} | Non {current.results.no} | Abst {current.results.abstain}
+                    Oui {current.results.yes} | Non {current.results.no} | Abst{" "}
+                    {current.results.abstain}
                   </div>
                 </div>
 
@@ -536,6 +684,17 @@ export default function SurveyClient({ surveyId }: { surveyId: string }) {
             )}
           </div>
         </div>
+      )}
+
+      {/* Modal d’édition (z-50) */}
+      {isOwner && (
+        <EditCandidateModal
+          open={!!editId}
+          onClose={() => setEditId(null)}
+          onSave={saveEdit}
+          form={editForm}
+          setForm={setEditForm}
+        />
       )}
     </div>
   );

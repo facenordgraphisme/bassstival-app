@@ -1,23 +1,19 @@
 export const ROLES = [
-  "admin",       // accès total + gestion utilisateurs/roles
-  "staff",       // accès total hors admin mgmt si tu veux
-  "tools",       // Outils (prêts)
-  "volunteers",  // Bénévoles
-  "lineup",      // Artistes / bookings
-  "polls",
+  "admin", "staff", "tools", "volunteers", "lineup", "polls", "communication"
 ] as const;
 
 export type Role = typeof ROLES[number];
 
 export const SECTION_PERMS: Record<
-  "root" | "tools" | "volunteers" | "lineup" | "admin",
+  "root" | "tools" | "volunteers" | "lineup" | "admin" | "communication",
   Role[]
 > = {
-  root: ["admin", "staff", "tools", "volunteers", "lineup"],
+  root: ["admin", "staff", "tools", "volunteers", "lineup", "communication"],
   tools: ["admin", "staff", "tools"],
   volunteers: ["admin", "staff", "volunteers"],
   lineup: ["admin", "staff", "lineup"],
   admin: ["admin"],
+  communication: ["admin", "staff", "communication"],
 };
 
 export function hasAnyRole(

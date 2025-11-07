@@ -9,23 +9,22 @@ type AuthenticatedRequest = NextRequest & { auth?: Session | null };
 export default auth((req: AuthenticatedRequest) => {
   const { pathname, search } = req.nextUrl;
 
-  // ✅ Routes publiques à laisser passer (pas d'auth middleware ici)
+  // ✅ Routes publiques
   if (
-    pathname.startsWith("/api/auth") ||     // NextAuth
-    pathname.startsWith("/api/proxy") ||    // ⬅️ IMPORTANT: le proxy gère déjà l'auth côté serveur
-    pathname === "/login"
+    pathname.startsWith("/api/auth") ||
+    pathname.startsWith("/api/proxy") ||
+    pathname === "/login" ||
+    pathname === "/403"             // <— AJOUT
   ) {
     return NextResponse.next();
   }
 
-  // Fichiers statiques ou internes
+  // Fichiers statiques
   if (/\.[\w]+$/.test(pathname) || pathname.startsWith("/_next") || pathname.startsWith("/static")) {
     return NextResponse.next();
   }
 
   const session = req.auth;
-
-  // Non connecté → redirection vers /login (on garde la query)
   if (!session?.user) {
     const url = new URL("/login", req.url);
     url.searchParams.set("callbackUrl", pathname + (search || ""));
@@ -40,10 +39,15 @@ export default auth((req: AuthenticatedRequest) => {
     (pathname.startsWith("/volunteers") && hasAnyRole(roles, SECTION_PERMS.volunteers)) ||
     (pathname.startsWith("/lineup") && hasAnyRole(roles, SECTION_PERMS.lineup)) ||
     (pathname.startsWith("/admin") && hasAnyRole(roles, SECTION_PERMS.admin)) ||
-    (!pathname.startsWith("/tools") &&
+    (pathname.startsWith("/communication") && hasAnyRole(roles, SECTION_PERMS.communication)) || // <— AJOUT
+    (
+      // par défaut, on autorise *seulement* si ce n’est pas une section privée
+      !pathname.startsWith("/tools") &&
       !pathname.startsWith("/volunteers") &&
       !pathname.startsWith("/lineup") &&
-      !pathname.startsWith("/admin"));
+      !pathname.startsWith("/admin") &&
+      !pathname.startsWith("/communication") // <— AJOUT pour éviter le contournement
+    );
 
   if (!allow) {
     return NextResponse.redirect(new URL("/403", req.url));
@@ -53,7 +57,6 @@ export default auth((req: AuthenticatedRequest) => {
 });
 
 export const config = {
-  // ✅ n’applique PAS ce middleware à /api/proxy ni /api/auth ni aux assets
   matcher: [
     "/((?!api/proxy|api/auth|_next|static|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp|css|js|map)).*)",
   ],

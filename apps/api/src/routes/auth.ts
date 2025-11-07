@@ -11,7 +11,8 @@ const router = Router();
 
 /* --------------------------- Rôles & types --------------------------- */
 
-const ROLES = ["admin", "staff", "tools", "volunteers", "lineup", "polls"] as const;
+const ROLES = ["admin", "staff", "tools", "volunteers", "lineup", "polls", "communication"] as const;
+
 type Role = (typeof ROLES)[number];
 
 function isValidRoles(input: unknown): input is Role[] {

@@ -1,37 +1,45 @@
 "use client";
 import { motion } from "framer-motion";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
-/* FadeUp — simple fade + slide */
+/* FadeUp — fade/slide after mount (no SSR mismatch) */
 export function FadeUp({
   children,
   className = "",
   duration = 0.25,
 }: { children: ReactNode; className?: string; duration?: number }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   return (
     <motion.div
       className={className}
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
+      /* Do not set a different "initial" than SSR output */
+      initial={false}
+      animate={mounted ? { opacity: 1, y: 0 } : { opacity: 1, y: 0 }}
       transition={{ duration }}
+      /* start visually hidden via CSS only if you really want; keeping at 1/0 avoids mismatch */
     >
       {children}
     </motion.div>
   );
 }
 
-/* ScaleIn — petit zoom */
+/* ScaleIn — same pattern as above */
 export function ScaleIn({
   children,
   className = "",
   duration = 0.3,
   delay = 0,
 }: { children: ReactNode; className?: string; duration?: number; delay?: number }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   return (
     <motion.div
       className={className}
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
+      initial={false}
+      animate={mounted ? { opacity: 1, scale: 1 } : { opacity: 1, scale: 1 }}
       transition={{ duration, delay }}
     >
       {children}
@@ -39,31 +47,33 @@ export function ScaleIn({
   );
 }
 
-/* ✅ MAJ: StaggerList -> wrappers en <div> */
+/* StaggerList — no SSR-only "initial"; stagger when mounted */
 export function StaggerList({
   children,
   className = "",
   gap = 0.1,
 }: { children: ReactNode[] | ReactNode; className?: string; gap?: number }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const items = Array.isArray(children) ? children : [children];
+
   return (
     <motion.div
       className={className}
-      initial="hidden"
-      animate="show"
-      variants={{
-        hidden: {},
-        show: { transition: { staggerChildren: gap } },
-      }}
+      initial={false}
+      animate={mounted ? "show" : "show"}
+      variants={{ show: { transition: { staggerChildren: gap } } }}
     >
       {items.map((child, i) => (
         <motion.div
           key={i}
           variants={{
-            hidden: { opacity: 0, y: 10 },
             show: { opacity: 1, y: 0 },
           }}
+          initial={false}
+          animate={mounted ? "show" : "show"}
           transition={{ duration: 0.25 }}
+          style={{ opacity: 1, transform: "translateY(0px)" }}
         >
           {child}
         </motion.div>
