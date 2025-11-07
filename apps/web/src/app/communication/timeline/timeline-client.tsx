@@ -229,23 +229,24 @@ export default function TimelineClient() {
       .slice(-10);
   }, [overdueData]);
 
-  const rows = data?.data ?? [];
+  // const rows = data?.data ?? [];
 
   // filtre texte + tri
   const filtered = useMemo(() => {
+    const rows = (data?.data ?? []) as CommEvent[];
     const s = q.trim().toLowerCase();
     const base = s
       ? rows.filter((r) =>
           [r.title, r.body ?? "", r.hashtags ?? ""].join(" ").toLowerCase().includes(s)
         )
       : rows;
+
     return [...base].sort((a, b) => {
       const ta = a.scheduledAt ? new Date(a.scheduledAt).getTime() : Infinity;
       const tb = b.scheduledAt ? new Date(b.scheduledAt).getTime() : Infinity;
       return ta - tb;
     });
-  }, [rows, q]);
-
+  }, [data, q]);
   // Groupes par mois
   const groups = useMemo(() => {
     const g: { month: string; items: CommEvent[] }[] = [];
@@ -394,7 +395,9 @@ useEffect(() => {
           <select
             className="input"
             value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value as any)}
+            onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+              setFilterStatus((e.target.value as CommStatus) || "")
+            }
           >
             <option value="">Tous statuts</option>
             {Object.entries(STATUS_LABELS).map(([k, v]) => (

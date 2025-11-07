@@ -19,18 +19,10 @@ function useConfirmDelete(onDelete: (id: string) => Promise<void>) {
   return (id: string) => {
     toast.custom(
       (t: string | number) => (
-        <div
-          className="
-            rounded-xl border border-white/10 bg-black/70 backdrop-blur
-            px-4 py-3 text-sm flex items-center gap-3
-            shadow-[0_10px_30px_-15px_rgba(0,0,0,.7)]
-          "
-        >
+        <div className="rounded-xl border border-white/10 bg-black/70 backdrop-blur px-4 py-3 text-sm flex items-center gap-3 shadow-[0_10px_30px_-15px_rgba(0,0,0,.7)]">
           <div className="font-medium">Supprimer ce sondage ?</div>
           <div className="ml-auto flex gap-2">
-            <button className="text-sm" onClick={() => toast.dismiss(t)}>
-              Annuler
-            </button>
+            <button className="text-sm" onClick={() => toast.dismiss(t)}>Annuler</button>
             <button
               className="btn text-sm"
               onClick={async () => {
@@ -39,8 +31,9 @@ function useConfirmDelete(onDelete: (id: string) => Promise<void>) {
                 try {
                   await onDelete(id);
                   toast.success("Sondage supprimé", { id: loading });
-                } catch (e: any) {
-                  toast.error(e?.message ?? "Erreur suppression", { id: loading });
+                } catch (e: unknown) {
+                  const msg = e instanceof Error ? e.message : "Erreur suppression";
+                  toast.error(msg, { id: loading });
                 }
               }}
             >
@@ -54,19 +47,18 @@ function useConfirmDelete(onDelete: (id: string) => Promise<void>) {
   };
 }
 
+
 /* ------------ Carte sondage ------------ */
 function SurveyCard({
   s,
   isOwner,
   canEdit,
-  onDeleteSurvey,
   revalidate,
   onConfirmDelete,
 }: {
   s: PollSurvey;
   isOwner: boolean;
   canEdit: boolean;
-  onDeleteSurvey: (id: string) => Promise<void>;
   revalidate: () => void;
   onConfirmDelete: (id: string) => void;
 }) {
@@ -88,8 +80,9 @@ function SurveyCard({
       toast.success("Sondage mis à jour", { id: t });
       setEditing(false);
       revalidate();
-    } catch (e: any) {
-      toast.error(e?.message ?? "Erreur de mise à jour", { id: t });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Erreur de mise à jour";
+      toast.error(msg, { id: t });
     }
   };
 
@@ -337,7 +330,6 @@ export default function SurveysClient() {
                 s={s}
                 isOwner={isOwner}
                 canEdit={canEdit}
-                onDeleteSurvey={onDeleteSurvey}
                 revalidate={mutate}
                 onConfirmDelete={onConfirmDelete}
               />

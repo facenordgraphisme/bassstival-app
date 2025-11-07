@@ -221,15 +221,15 @@ export default function SurveyClient({ surveyId }: { surveyId: string }) {
     description: "",
   });
   const openEdit = (c: PollSurveyDetail["candidates"][number]) => {
-    setEditId(c.id);
-    setEditForm({
-      artist_name: c.artist_name,
-      genre: c.genre,
-      youtube_link: c.youtube_link,
-      image_url: c.image_url ?? "",
-      description: (c as any).description ?? "",
-    });
-  };
+      setEditId(c.id);
+      setEditForm({
+        artist_name: c.artist_name,
+        genre: c.genre,
+        youtube_link: c.youtube_link,
+        image_url: c.image_url ?? "",
+        description: c.description ?? "", // ✅ plus de any
+      });
+    };
   const saveEdit = async () => {
     if (!editId) return;
     const t = toast.loading("Mise à jour…");
@@ -456,9 +456,9 @@ export default function SurveyClient({ surveyId }: { surveyId: string }) {
                   <div className="min-w-0">
                     <div className="font-semibold truncate">{c.artist_name}</div>
                     <div className="text-sm opacity-80">{c.genre}</div>
-                    {(c as any).description && (
+                    {c.description && ( // ✅ plus de any
                       <p className="text-sm opacity-80 mt-1 line-clamp-3">
-                        {(c as any).description}
+                        {c.description}
                       </p>
                     )}
                   </div>
@@ -585,12 +585,12 @@ export default function SurveyClient({ surveyId }: { surveyId: string }) {
               <div className="space-y-3">
                 <div className="flex items-start justify-between">
                   <div>
-                    <div className="text-xl font-semibold">{current.artist_name}</div>
-                    <div className="opacity-80">{current.genre}</div>
-                    {(current as any).description && (
-                      <p className="text-sm opacity-80 mt-2 max-w-prose">
-                        {(current as any).description}
-                      </p>
+                     <div className="text-xl font-semibold">{current.artist_name}</div>
+                      <div className="opacity-80">{current.genre}</div>
+                      {current.description && ( // ✅
+                        <p className="text-sm opacity-80 mt-2 max-w-prose">
+                          {current.description}
+                        </p>
                     )}
                   </div>
                   <a
