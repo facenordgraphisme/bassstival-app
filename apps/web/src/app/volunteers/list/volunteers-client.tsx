@@ -53,15 +53,20 @@ function TileDecor({ ring = "ring-[color-mix(in_srgb,var(--vio)_20%,transparent)
 
 /* ---------- component ---------- */
 export default function VolunteersClient() {
-  const [q, setQ] = useState("");
-  const [team, setTeam] = useState<Team | "">("");
-  const [order, setOrder] = useState<"asc" | "desc">("asc");
+type TeamFilter = "" | Team | "none"; // "" = toutes, "none" = sans équipe
 
-  const { data, mutate, isLoading } = useSWR<Volunteer[]>(
-    ["volunteers", q, team || "-", order],
-    () => listVolunteers({ q, team: team || undefined, order }),
-    { keepPreviousData: true, fallbackData: [] }
-  );
+  const [q, setQ] = useState("");
+  const [team, setTeam] = useState<TeamFilter>("");         // 👈 accepte "none"
+  const [order, setOrder] = useState<"asc" | "desc">("asc");
+  const [grouped, setGrouped] = useState(false);            // 👈 toggle vue groupée
+const effectiveTeam =
+  team === "" || team === "none" ? undefined : (team as Team);
+
+const { data, mutate, isLoading } = useSWR<Volunteer[]>(
+  ["volunteers", q, team || "-", order],
+  () => listVolunteers({ q, team: effectiveTeam, order }), // 👈 on passe la valeur corrigée
+  { keepPreviousData: true, fallbackData: [] }
+);
 
   // ---- Création ----
   const [showForm, setShowForm] = useState(false);
@@ -152,37 +157,53 @@ export default function VolunteersClient() {
     }
   };
 
-  const rows: Volunteer[] = data || [];
-  const showGrouped = !q && !team;
+  const all: Volunteer[] = data || [];
 
-  const groupedByTeam = useMemo(() => {
-    if (!showGrouped) return null;
-    const sorted = [...rows].sort((a, b) => {
-      const an = `${a.lastName} ${a.firstName}`.toLowerCase();
-      const bn = `${b.lastName} ${b.firstName}`.toLowerCase();
-      return order === "asc" ? an.localeCompare(bn) : bn.localeCompare(an);
-    });
-    const map = new Map<Team, Volunteer[]>();
-    for (const t of TEAMS) map.set(t, []);
-    for (const v of sorted) {
-      const key = (TEAMS.includes(v.team) ? v.team : "autre") as Team;
-      map.get(key)!.push(v);
-    }
-    return TEAMS.map((t) => ({ team: t, items: map.get(t)! }));
-  }, [rows, order, showGrouped]);
+// --- filtre équipe côté client (béton même si l’API ne filtre pas) ---
+const byTeam = (v: Volunteer) => {
+  if (team === "") return true;           // toutes
+  if (team === "none") return !v.team;    // sans équipe
+  return v.team === team;                 // équipe précise
+};
+
+// --- tri alpha sur Nom Prénom ---
+const sortByName = (a: Volunteer, b: Volunteer) => {
+  const an = `${a.lastName} ${a.firstName}`.toLowerCase();
+  const bn = `${b.lastName} ${b.firstName}`.toLowerCase();
+  return order === "asc" ? an.localeCompare(bn) : bn.localeCompare(an);
+};
+
+// --- on applique le tri + filtre ---
+const rows: Volunteer[] = [...all].filter(byTeam).sort(sortByName);
+
+// --- vue groupée activable par toggle ---
+const showGrouped = grouped && !q; // groupé SI toggle actif et pas de recherche
+const TEAMS_WITH_NULL: Array<Team | null> = ["bar","billetterie","parking","bassspatrouille","tech","autre", null];
+
+const groupedByTeam = useMemo(() => {
+  if (!showGrouped) return null;
+  const map = new Map<Team | null, Volunteer[]>();
+  for (const t of TEAMS_WITH_NULL) map.set(t, []);
+  for (const v of rows) {
+    const key = (v.team ?? null) as Team | null;
+    map.get(key)!.push(v);
+  }
+  return TEAMS_WITH_NULL.map((t) => ({ team: t, items: map.get(t)! }));
+}, [rows, showGrouped]);
 
   return (
     <FadeUp className="space-y-8">
       <div className="flex items-center gap-3">
-        <BackButton className="!px-2.5 !py-1.5 mt-2 mr-2" />
+          <BackButton className="!px-2.5 !py-1.5 mt-2 mr-2" />
         <h1 className="text-3xl font-extrabold title-underline" style={{ fontFamily: "var(--font-title)" }}>
           Liste des bénévoles
         </h1>
       </div>
 
       {/* Filtres */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div className="flex flex-col sm:flex-row gap-3">
+      <div className="flex flex-col gap-4">
+        {/* Ligne 1 : recherche + filtres principaux */}
+        <div className="flex flex-wrap items-end gap-3">
           <div className="input-wrap">
             <input
               className="input input-icon w-64"
@@ -193,8 +214,14 @@ export default function VolunteersClient() {
             <Search className="icon-left" size={18} aria-hidden />
           </div>
 
-          <select className="input" value={team} onChange={(e) => setTeam(e.target.value as Team | "")}>
+          <select
+            className="input min-w-[180px]"
+            value={team}
+            onChange={(e) => setTeam(e.target.value as TeamFilter)}
+            title="Filtrer par équipe"
+          >
             <option value="">Toutes équipes</option>
+            <option value="none">Sans équipe</option>
             {TEAM_KEYS.map((t) => (
               <option key={t} value={t}>
                 {TEAM_LABEL[t]}
@@ -202,10 +229,25 @@ export default function VolunteersClient() {
             ))}
           </select>
 
-          <select className="input" value={order} onChange={(e) => setOrder(e.target.value as "asc" | "desc")}>
+          <select
+            className="input min-w-[150px]"
+            value={order}
+            onChange={(e) => setOrder(e.target.value as "asc" | "desc")}
+            title="Trier"
+          >
             <option value="asc">Nom A→Z</option>
             <option value="desc">Nom Z→A</option>
           </select>
+
+          <label className="inline-flex items-center gap-2 text-sm bg-white/5 px-3 py-2 rounded-lg border border-white/10">
+            <input
+              type="checkbox"
+              className="accent-current"
+              checked={grouped}
+              onChange={(e) => setGrouped(e.target.checked)}
+            />
+            <span>Afficher par équipe</span>
+          </label>
 
           {(q || team) && (
             <button
@@ -220,10 +262,14 @@ export default function VolunteersClient() {
           )}
         </div>
 
-        <button className="btn" onClick={() => setShowForm((v) => !v)}>
-          <Plus size={16} className="mr-2" /> Nouveau bénévole
-        </button>
+        {/* Ligne 2 : bouton d’action principal */}
+        <div className="flex items-center justify-end">
+          <button className="btn" onClick={() => setShowForm((v) => !v)}>
+            <Plus size={16} className="mr-2" /> Nouveau bénévole
+          </button>
+        </div>
       </div>
+
 
       {/* Formulaire création */}
       {showForm && (
@@ -291,9 +337,11 @@ export default function VolunteersClient() {
       {showGrouped && groupedByTeam && (
         <div className="space-y-8">
           {groupedByTeam.map(({ team: t, items }) => (
-            <section key={t} className="space-y-3">
+            <section key={String(t)} className="space-y-3">
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold capitalize">{t}</h2>
+                <h2 className="text-xl font-bold capitalize">
+                  {t ? TEAM_LABEL[t] : "Sans équipe"} {/* 👈 */}
+                </h2>
                 <span className="badge">{items.length}</span>
               </div>
 
@@ -301,7 +349,6 @@ export default function VolunteersClient() {
                 {items.map((v) => (
                   <div key={v.id} className={tileBase}>
                     <TileDecor />
-
                     <div className="relative z-10 space-y-2">
                       <div className="flex items-center justify-between">
                         <div className="font-semibold truncate">
@@ -318,7 +365,7 @@ export default function VolunteersClient() {
                       </div>
 
                       <div className="text-xs opacity-70">
-                        Équipe : <span className="font-medium">{TEAM_LABEL[v.team]}</span>
+                        Équipe : <span className="font-medium">{v.team ? TEAM_LABEL[v.team] : "—"}</span>
                       </div>
                       <div className="text-sm opacity-80 truncate">Email: {v.email || "—"}</div>
                       <div className="text-sm opacity-80 truncate">Téléphone: {v.phone || "—"}</div>
@@ -440,8 +487,9 @@ export default function VolunteersClient() {
                 <select
                   className="input"
                   value={editForm.team}
-                  onChange={(e) => setEditForm((f) => ({ ...f, team: e.target.value as Team }))}
+                  onChange={(e) => setEditForm((f) => ({ ...f, team: e.target.value as Team | "" }))}
                 >
+                  <option value="">— Aucune —</option> {/* 👈 */}
                   {TEAM_KEYS.map((t) => (
                     <option key={t} value={t}>
                       {TEAM_LABEL[t]}

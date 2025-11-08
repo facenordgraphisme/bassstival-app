@@ -75,8 +75,8 @@ export default function VolunteersHome() {
       {/* Header responsive */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-col gap-2 w-full sm:w-auto">
-          <div className="flex items-center flex-wrap gap-2">
-            <BackButton className="!px-2.5 !py-1.5" />
+          <div className="flex items-center gap-3">
+              <BackButton className="!px-2.5 !py-1.5 mt-2 mr-2" />
             <h1
               className="text-2xl md:text-3xl font-extrabold leading-tight break-words whitespace-normal title-underline"
               style={{ fontFamily: "var(--font-title)" }}

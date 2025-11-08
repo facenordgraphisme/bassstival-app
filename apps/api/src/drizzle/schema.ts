@@ -50,7 +50,7 @@ export const volunteers = pgTable("volunteers", {
   lastName: text("last_name").notNull(),
   phone: text("phone"),
   email: text("email"),
-  team: teamEnum("team").notNull().default("autre"),
+  team: teamEnum("team"),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -268,7 +268,26 @@ export const commPublications = pgTable("comm_publications", {
   tags: text("tags").array(),
   createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (t) => ({
   byUpdated: index("ix_comm_publications_updated").on(t.updatedAt),
+}));
+
+export const pubAction = pgEnum("pub_action", ["create", "update", "delete"]);
+
+export const commPublicationHistory = pgTable("comm_publication_history", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  publicationId: uuid("publication_id")
+    .references(() => commPublications.id, { onDelete: "cascade" })
+    .notNull(),
+  action: pubAction("action").notNull(),
+  changedBy: uuid("changed_by").references(() => users.id, { onDelete: "set null" }),
+  changedAt: timestamp("changed_at").defaultNow().notNull(),
+  changedFields: text("changed_fields").array().notNull().default([]), // ex: ["title","body"]
+  before: jsonb("before"), // snapshot avant
+  after: jsonb("after"),   // snapshot après
+  note: text("note"),
+}, (t) => ({
+  byPublication: index("ix_comm_pub_history_publication_time").on(t.publicationId, t.changedAt),
 }));

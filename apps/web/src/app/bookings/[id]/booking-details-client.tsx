@@ -20,6 +20,7 @@ import {
 import { STAGE_LABEL } from "@/lib/utils-booking";
 import type { Stage } from "@/lib/artists";
 import { getArtist, type ArtistWithContacts } from "@/lib/artists";
+import BackButton from "@/components/BackButton";
 
 function errMsg(e: unknown): string {
   return e instanceof Error ? e.message : "Erreur";
@@ -139,10 +140,13 @@ const saveTiming = async () => {
     <div className="space-y-6">
         {artist ? (
         <div className="text-center space-y-2 mt-4">
-          <h1 className="lg:text-3xl text-xl font-extrabold title-underline"
-        style={{ fontFamily: "var(--font-title)" }}>
-            {artist.name}
-          </h1>
+          <div className="flex items-center gap-3">
+            <BackButton className="!px-2.5 !py-1.5 mt-2 mr-2" />
+            <h1 className="lg:text-3xl text-xl font-extrabold title-underline"
+          style={{ fontFamily: "var(--font-title)" }}>
+              {artist.name}
+            </h1>
+          </div>
           <div className="flex justify-center items-center gap-2 text-sm text-white/70 pt-2">
             {artist.genre && <span>{artist.genre}</span>}
             {artist.agency && <span>• {artist.agency}</span>}

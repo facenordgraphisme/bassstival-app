@@ -16,13 +16,15 @@ export default async function CommunicationPage() {
 
   return (
     <FadeUp className="space-y-6">
-      <BackButton className="!px-2.5 !py-1.5 mt-2 mr-2" />
-      <h1
-        className="text-2xl md:text-3xl font-extrabold title-underline"
-        style={{ fontFamily: "var(--font-title)" }}
-      >
-        Communication
-      </h1>
+      <div className="flex items-center gap-3">
+        <BackButton className="!px-2.5 !py-1.5 mt-2 mr-2" />
+        <h1
+          className="text-2xl md:text-3xl font-extrabold title-underline"
+          style={{ fontFamily: "var(--font-title)" }}
+        >
+          Communication
+        </h1>
+      </div>
       <CommunicationClient />
     </FadeUp>
   );

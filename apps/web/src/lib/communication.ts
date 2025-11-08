@@ -61,15 +61,31 @@ export type CommEvent = {
 export type CommPublication = {
   id: string;
   title: string;
-  channels: CommChannel[];            // ✅ plural
+  channels: CommChannel[];
   body: string;
-  hashtags: string | null;
-  linkUrl: string | null;
-  assets: CommAsset[];
-  tags: string[] | null;
-  createdBy: string | null;
+  hashtags?: string | null;
+  linkUrl?: string | null;
+  assets?: Array<{ kind: "image"|"video"; url: string; alt?: string }>;
+  tags?: string[] | null;
   createdAt: string;
   updatedAt: string;
+  createdBy?: string | null;
+  updatedBy?: string | null;
+  creator_name?: string | null; // 👈
+  editor_name?: string | null;  // 👈
+};
+
+export type CommPublicationHistoryItem = {
+  id: string;
+  action: "create" | "update" | "delete";
+  changedAt: string;
+  changedFields: string[];
+  before: unknown | null;
+  after: unknown | null;
+  note: string | null;
+  changedBy: string | null;
+  editor_name: string | null;
+  editor_email: string | null;
 };
 
 /* ===== Helpers ===== */
@@ -152,6 +168,11 @@ export const patchPublication = (id: string, p: Partial<{
 }>) => api<{ data: CommPublication }>(`/communication/publications/${id}`, {
   method: "PATCH", body: JSON.stringify(p),
 });
+
+export const getPublicationHistory = (id: string) =>
+  api<{ data: CommPublicationHistoryItem[] }>(`/communication/publications/${id}/history`, {
+    method: "GET",
+  });
 
 export const removePublication = (id: string) =>
   api<{ ok: true }>(`/communication/publications/${id}`, { method: "DELETE" });

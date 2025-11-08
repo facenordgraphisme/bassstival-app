@@ -3,6 +3,7 @@ import { useState } from "react";
 import { createLoan } from "@/lib/api";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
+import BackButton from "@/components/BackButton";
 
 type Row = { itemName: string; qtyOut: number };
 
@@ -42,7 +43,10 @@ export default function NewLoan() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: .3 }}
     >
-      <h1 className="text-3xl font-extrabold" style={{ fontFamily: "var(--font-title)" }}>Nouvelle fiche</h1>
+      <div className="flex items-center gap-3">
+        <BackButton className="!px-2.5 !py-1.5 mt-2 mr-2" />
+        <h1 className="text-3xl font-extrabold" style={{ fontFamily: "var(--font-title)" }}>Nouvelle fiche</h1>
+      </div>
       <div className="card space-y-4">
         <input className="input" placeholder="Nom de l'emprunteur" value={name} onChange={(e) => setName(e.target.value)} />
         <textarea className="input h-24" placeholder="Note (optionnel)" value={note} onChange={(e) => setNote(e.target.value)} />

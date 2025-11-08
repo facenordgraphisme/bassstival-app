@@ -14,6 +14,7 @@ import { motion } from "framer-motion";
 import { StaggerList } from "@/components/FX";
 import { useState } from "react";
 import { Trash2 } from "lucide-react";
+import BackButton from "@/components/BackButton";
 
 type LoanWithItems = Loan & { items: LoanItem[] };
 type Props = { id: string; initial?: LoanWithItems };
@@ -92,12 +93,15 @@ export default function LoanClient({ id, initial }: Props) {
     >
       {/* Header responsive */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1
-          className="text-2xl sm:text-3xl font-extrabold break-words"
-          style={{ fontFamily: "var(--font-title)" }}
-        >
-          {data.borrowerName}
-        </h1>
+        <div className="flex items-center gap-3">
+          <BackButton className="!px-2.5 !py-1.5 mt-2 mr-2" />
+          <h1
+            className="text-2xl sm:text-3xl font-extrabold break-words"
+            style={{ fontFamily: "var(--font-title)" }}
+          >
+            {data.borrowerName}
+          </h1>
+        </div>
         <div className="hidden sm:block">
           <button className="btn" onClick={onClose}>
             Clore la fiche

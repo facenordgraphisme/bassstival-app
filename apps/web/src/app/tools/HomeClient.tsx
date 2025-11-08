@@ -69,7 +69,7 @@ export default function HomeClient({
           {/* titre + back */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
-              <BackButton className="!px-2.5 !py-1.5" />
+                <BackButton className="!px-2.5 !py-1.5 mt-2 mr-2" />
               <h1
                 className="lg:text-3xl text-xl font-extrabold title-underline"
                 style={{ fontFamily: "var(--font-title)" }}

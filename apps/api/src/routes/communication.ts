@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { z } from "zod";
 import { db } from "../drizzle/db";
-import { commEvents, commStatusHistory, commPublications } from "../drizzle/schema";
+import { users } from "../drizzle/schema";
+import { commEvents, commStatusHistory, commPublications, commPublicationHistory  } from "../drizzle/schema";
 import { and, asc, desc, eq, gte, ilike, lte, sql } from "drizzle-orm";
 import { requireAuth, requireRoles } from "./auth";
 
@@ -62,6 +63,26 @@ async function logStatus(eventId: string, fromStatus: string|null, toStatus: str
     toStatus: toStatus as any,
     changedBy: (userId ?? null) as any,
     note: note ?? null,
+  } as any);
+}
+
+async function logPublicationHistory(params: {
+  publicationId: string;
+  action: "create" | "update" | "delete";
+  changedBy?: string | null;
+  changedFields?: string[];
+  before?: unknown;
+  after?: unknown;
+  note?: string;
+}) {
+  await db.insert(commPublicationHistory).values({
+    publicationId: params.publicationId as any,
+    action: params.action as any,
+    changedBy: (params.changedBy ?? null) as any,
+    changedFields: (params.changedFields ?? []) as any,
+    before: (params.before ?? null) as any,
+    after: (params.after ?? null) as any,
+    note: params.note ?? null,
   } as any);
 }
 
@@ -220,7 +241,6 @@ r.get("/events/:id/history", requireAuth, requireRoles("admin","staff","communic
    Publications (library)
    ======================= */
 
-// GET /communication/publications?channels=a,b&tags=a,b&q=
 r.get("/publications", requireAuth, requireRoles("admin","staff","communication"), async (req, res) => {
   const q = req.query as Record<string, string | undefined>;
   const where = [];
@@ -248,12 +268,33 @@ r.get("/publications", requireAuth, requireRoles("admin","staff","communication"
     }
   }
 
-  const rows = await db.select().from(commPublications)
-    .where(where.length ? and(...where) : sql`true`)
-    .orderBy(desc(commPublications.updatedAt));
+const rows = await db
+  .select({
+    id: commPublications.id,
+    title: commPublications.title,
+    channels: commPublications.channels,
+    body: commPublications.body,
+    hashtags: commPublications.hashtags,
+    linkUrl: commPublications.linkUrl,
+    assets: commPublications.assets,
+    tags: commPublications.tags,
+    createdAt: commPublications.createdAt,
+    updatedAt: commPublications.updatedAt,
+    createdBy: commPublications.createdBy,
+    updatedBy: commPublications.updatedBy,
+    creator_name: sql<string>`creator.display_name`,
+    editor_name: sql<string>`editor.display_name`,
+  })
+  .from(commPublications)
+  // 👇 deux LEFT JOIN “nommés” à la main
+  .leftJoin(sql`users as creator`, sql`creator.id = ${commPublications.createdBy}`)
+  .leftJoin(sql`users as editor`, sql`editor.id = ${commPublications.updatedBy}`)
+  .where(where.length ? and(...where) : sql`true`)
+  .orderBy(desc(commPublications.updatedAt));
 
   res.json({ data: rows });
 });
+
 
 // POST /communication/publications
 r.post("/publications", requireAuth, requireRoles("admin","staff","communication"), async (req, res) => {
@@ -266,17 +307,31 @@ r.post("/publications", requireAuth, requireRoles("admin","staff","communication
 
   const [created] = await db.insert(commPublications).values({
     title: parsed.data.title,
-    channels: parsed.data.channels as any, // ✅ multi-canaux
+    channels: parsed.data.channels as any, // multi-canaux
     body: parsed.data.body,
     hashtags: parsed.data.hashtags,
     linkUrl: parsed.data.link_url,
     assets: parsed.data.assets as any,
     tags: parsed.data.tags as any,
-    createdBy: userId as any,
+    createdBy: userId as any,   // ✅ créateur
+    updatedBy: userId as any,   // ✅ première édition = créateur
+    // updatedAt est géré par la colonne avec defaultNow() si tu l'as mise,
+    // sinon tu peux forcer: updatedAt: sql`now()`,
   }).returning();
+
+  await logPublicationHistory({
+  publicationId: created.id,
+  action: "create",
+  changedBy: userId,
+  changedFields: ["title","channels","body","hashtags","link_url","assets","tags"],
+  before: null,
+  after: created,
+  note: "created",
+});
 
   res.status(201).json({ data: created });
 });
+
 
 // GET /communication/publications/:id
 r.get("/publications/:id", requireAuth, requireRoles("admin","staff","communication"), async (req, res) => {
@@ -286,34 +341,101 @@ r.get("/publications/:id", requireAuth, requireRoles("admin","staff","communicat
   res.json({ data: row });
 });
 
+r.get("/publications/:id/history", requireAuth, requireRoles("admin","staff","communication"), async (req, res) => {
+  const { id } = req.params;
+
+  const rows = await db
+    .select({
+      id: commPublicationHistory.id,
+      action: commPublicationHistory.action,
+      changedAt: commPublicationHistory.changedAt,
+      changedFields: commPublicationHistory.changedFields,
+      before: commPublicationHistory.before,
+      after: commPublicationHistory.after,
+      note: commPublicationHistory.note,
+      changedBy: commPublicationHistory.changedBy,
+      editor_name: users.displayName,
+      editor_email: users.email,
+    })
+    .from(commPublicationHistory)
+    .leftJoin(users, eq(commPublicationHistory.changedBy, users.id))
+    .where(eq(commPublicationHistory.publicationId, id))
+    .orderBy(desc(commPublicationHistory.changedAt));
+
+  res.json({ data: rows });
+});
 // PATCH /communication/publications/:id
 r.patch("/publications/:id", requireAuth, requireRoles("admin","staff","communication"), async (req, res) => {
   const { id } = req.params;
+  const claims = (req as any).user as { sub?: string } | undefined;
+  const userId = String(claims?.sub || "");
+
   const parsed = zPublicationPatch.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: "Invalid body", details: parsed.error.flatten() });
   }
 
+  // charger la version "avant"
+  const [before] = await db.select().from(commPublications).where(eq(commPublications.id, id)).limit(1);
+  if (!before) return res.status(404).json({ error: "Not found" });
+
   const patch: any = {};
-  if (parsed.data.title !== undefined) patch.title = parsed.data.title;
-  if (parsed.data.channels !== undefined) patch.channels = parsed.data.channels; // ✅
-  if (parsed.data.body !== undefined) patch.body = parsed.data.body;
-  if (parsed.data.hashtags !== undefined) patch.hashtags = parsed.data.hashtags;
-  if (parsed.data.link_url !== undefined) patch.linkUrl = parsed.data.link_url;
-  if (parsed.data.assets !== undefined) patch.assets = parsed.data.assets;
-  if (parsed.data.tags !== undefined) patch.tags = parsed.data.tags;
+  const changedFields: string[] = [];
+
+  if (parsed.data.title !== undefined) { patch.title = parsed.data.title; changedFields.push("title"); }
+  if (parsed.data.channels !== undefined) { patch.channels = parsed.data.channels; changedFields.push("channels"); }
+  if (parsed.data.body !== undefined) { patch.body = parsed.data.body; changedFields.push("body"); }
+  if (parsed.data.hashtags !== undefined) { patch.hashtags = parsed.data.hashtags; changedFields.push("hashtags"); }
+  if (parsed.data.link_url !== undefined) { patch.linkUrl = parsed.data.link_url; changedFields.push("link_url"); }
+  if (parsed.data.assets !== undefined) { patch.assets = parsed.data.assets; changedFields.push("assets"); }
+  if (parsed.data.tags !== undefined) { patch.tags = parsed.data.tags; changedFields.push("tags"); }
+
+  // marquer éditeur + MAJ horodatage
   patch.updatedAt = sql`now()`;
+  patch.updatedBy = userId as any;
 
   const [updated] = await db.update(commPublications).set(patch).where(eq(commPublications.id, id)).returning();
   if (!updated) return res.status(404).json({ error: "Not found" });
+
+  // journal
+  await logPublicationHistory({
+    publicationId: id,
+    action: "update",
+    changedBy: userId,
+    changedFields,
+    before,
+    after: updated,
+    note: "patch",
+  });
+
   res.json({ data: updated });
 });
+
 
 // DELETE /communication/publications/:id
 r.delete("/publications/:id", requireAuth, requireRoles("admin","staff","communication"), async (req, res) => {
   const { id } = req.params;
+  const claims = (req as any).user as { sub?: string } | undefined;
+  const userId = String(claims?.sub || "");
+
+  const [before] = await db.select().from(commPublications).where(eq(commPublications.id, id)).limit(1);
+
   await db.delete(commPublications).where(eq(commPublications.id, id));
+
+  if (before) {
+    await logPublicationHistory({
+      publicationId: id,
+      action: "delete",
+      changedBy: userId,
+      changedFields: [],
+      before,
+      after: null,
+      note: "delete",
+    });
+  }
+
   res.json({ ok: true });
 });
+
 
 export default r;
